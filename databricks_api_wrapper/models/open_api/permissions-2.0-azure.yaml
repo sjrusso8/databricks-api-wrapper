@@ -1,0 +1,3794 @@
+openapi: 3.0.0
+info:
+  version: 2.0.0
+  title: Permissions API
+  description:
+    "This feature is in
+    [Public Preview](https://docs.microsoft.com/azure/databricks/release-notes/release-types).\n
+
+    **Important:** To access Azure Databricks REST APIs, you must [authenticate](https://docs.microsoft.com/azure/databricks/dev-tools/api/latest/authentication).\n
+
+    The Permissions API supports several objects and endpoints:\n
+
+    * **[Token permissions](#tag/Token-permissions)** — Manage which users can create or use tokens.\n
+
+    * **[Cluster permissions](#tag/Cluster-permissions)** — Manage which users can manage, restart, or attach to clusters.\n
+
+    * **[Pool permissions](#tag/Pool-permissions)** — Manage which users can manage or attach to pools. Some APIs and documentation refer to pools as _instance pools_.\n
+
+    * **[Job permissions](#tag/Job-permissions)** — Manage which users can view, manage, trigger, cancel, or own a job.\n
+
+    * **[Delta Live Tables pipeline permissions](#tag/Pipeline-permissions)** — Manage which users can view, manage, run, cancel, or own a [Delta Live Tables](https://docs.microsoft.com/azure/databricks/data-engineering/delta-live-tables/index.html) pipeline.\n
+
+    * **[Notebook permissions](#tag/Notebook-permissions)** — Manage which users can read, run, edit or manage a notebook.\n
+
+    * **[Directory permissions](#tag/Directory-permissions)** — Manage which users can read, run, edit, or manage all notebooks in a directory.\n
+
+    * **[MLflow experiment permissions](#tag/MLflow-experiment-permissions)** — Manage which users can read, edit, or manage MLflow experiments.\n
+
+    * **[MLflow registered model permissions](#tag/MLflow-registered-model-permissions)** — Manage which users can read, edit, or manage MLflow registered models.\n
+
+    * **[SQL endpoint permissions](#tag/SQL-endpoint-permissions)** — Manage which users can use or manage SQL endpoints.\n
+
+    * **[Repo permissions](#tag/Repo-permissions)** — Manage which users can read, run, edit, or manage a repo.\n
+
+    ### Permission Inheritance
+
+    In some cases, objects can inherit permissions. Object types vary in how they handle inherited permissions from parent objects and root objects of the same object type. View JSON responses for details. Permissions in responses include the `inherited` property set to `true` if those permissions were inherited. In that case, the property `inherited_from_object` indicates from what object it inherited those permissions.\n
+
+    Keep in mind the following rules:\n
+
+    * A root object of each object type does not inherit permissions.\n
+
+    * For tokens, you set permissions on the root object of that type so those object types never inherit permissions.\n
+
+    * For directories, permissions can be inherited from all descendent directories. However, you can set permissions directly on the root directory and it has no parent, so the root directory never inherits permissions.\n
+
+    * All other object types (clusters, pools, jobs, pipelines, notebooks, registered models) inherit permissions from their root object.\n
+
+    Clusters and notebooks can inherit permissions from other object types:
+
+    * Clusters inherit permissions from the root cluster object. Additionally, if the cluster is created from a job or a pipeline, the cluster also inherits permissions from the corresponding job or pipeline.\n
+
+    * Notebooks inherit permissions from descendent directories, similar to how directories inherit permissions from their descendent directories. For example, a notebook with path `/Users/jsmith@example.com/myNotebook` can inherit permissions from **all** of the following objects: `/` (root directory), `/Users`, and `/Users/jsmith@example.com`.\n
+
+    For every object that you can set direct permissions on, the direct permissions in the JSON response have `inherited` set to `false`."
+
+tags:
+
+  - name: Token permissions
+    description:
+      "Manage permissions that define who can create or use tokens.\n
+
+      There are several levels of token permissions that a user can have:\n
+
+      * No permissions\n
+
+      * Can Use (`CAN_USE`) — For workspaces created after the release of <Databricks> platform version 3.28 (Sept 9-15, 2020) the default is for no users to have the Can Use permission. Admins must explicitly grant those permissions, whether to the entire `users` group or on a user-by-user or group-by-group basis. **Important:** Workspaces created before 3.28 was released will maintain the permissions that were already in place. The default was for all users to have the Can Use permission. Admins can revoke that group permission assignment and add it to other groups or to individual non-admin users.\n
+
+      * Can Manage (`CAN_MANAGE`) — Administrative users only. The `admins` group gets this permission and it cannot be changed. No other groups or users can be granted this permission. The API enforces these rules.\n
+
+      For tokens, you set permissions on the root object so the results never inherit permissions. This means that in responses, `inherited` is always `false`. For general information about permission inheritance, see the introduction at the top of this page.\n
+
+      For specific actions, specific permission levels are required.\n
+
+      Create a token:\n
+        * Can Use or Can Manage\n
+
+      Use a token for authentication:\n
+        * Can Use or Can Manage\n
+
+      Revoke your own token:\n
+        * Can Use or Can Manage\n
+
+      Revoke any user’s token (requires Token Management API):\n
+        * Can Manage\n
+
+      List all tokens (requires Token Management API):\n
+        * Can Manage\n
+
+      Modify who can use token (requires Token Management API):\n
+        * Can Manage\n
+
+      #### Revoking permissions
+
+      For workspaces created after September 9, 2020, no users have Can Use permission by default. Admins can individually assign the Can Use permission to users and groups. \n
+
+      **Important:** For workspaces created before that date, all non-admin users have the Can Use permission through permissions granted to the `users` group. Admins can revoke that group permission assignment and add it to other groups or to individual non-admin users. To remove that default access, do not assign permissions to `users` group in this API. You can optionally add explicit `CAN_USE` access for other entities.\n
+
+      You cannot use the [update tokens permissions for a specific entity API](#operation/set-tokens-permissions) (`PATCH /permissions/authorization/tokens`) API to revoke access from any entity. To revoke permissions, instead use the [replace token permissions for entire workspace API](#operation/update-tokens-permissions) (`PUT /permissions/authorization/tokens`). That request requires that you specify the complete set of permissions for all entities that are granted permissions for the entire workspace. \n
+
+      If you want to only authorize **some** non-admin users to create and use tokens, do all three of the following:\n
+
+      * **Grant** the Can Use permission to specific users, groups, and service principals.\n
+
+      * **Do not grant** the Can Use permission to the built-in `users` group if you want to only authorize some non-admin users. You can optionally choose to assign the permission to this group, in which case all non-admin users can create and use tokens. \n
+
+      * **Grant** the Can Manage permission to the built-in `admins` group. This is a requirement of the API.\n
+
+      **WARNING:** If you revoke the Can Use permission from a group and a user does not have the Can Use permission directly or indirectly through a group, that user’s tokens are immediately deleted. Deleted tokens cannot be retrieved."
+
+  - name: Cluster permissions
+    description:
+      "Manage user permissions for clusters.\n
+
+      There are four permission levels for a cluster:\n
+
+      * No Permissions\n
+
+      * Can Attach To (`CAN_ATTACH_TO`)\n
+
+      * Can Restart (`CAN_RESTART`)\n
+
+      * Can Manage (`CAN_MANAGE`).\n
+
+      For the mapping of the required permissions for specific actions or abilities, see [Cluster access control](https://docs.microsoft.com/azure/databricks/security/access-control/cluster-acl).\n
+
+      Clusters inherit permissions from their root object. Additionally, if the cluster is created from a job, the cluster also inherits permissions from the job. For general information about permission inheritance, see the introduction at the top of this page."
+
+  - name: Pool permissions
+    description:
+      "Manage user permissions for pools.\n
+
+      There are three permission levels for a pool: \n
+
+      * No Permissions
+
+      * Can Attach To (`CAN_ATTACH_TO`)\n
+
+      * Can Manage (`CAN_MANAGE`)\n
+
+      For the mapping of the required permissions for specific actions or abilities, see [Instance pool control](https://docs.microsoft.com/azure/databricks/security/access-control/pool-acl).\n
+
+      Pools can inherit permissions from their root object. For general information about permission inheritance, see the introduction at the top of this page."
+
+  - name: Job permissions
+    description:
+      "Manage user permissions for jobs.\n
+
+      There are five permission levels for jobs:\n
+
+      * No Permissions\n
+
+      * Can View (`CAN_VIEW`) — User can view this job\n
+
+      * Can Manage Run (`CAN_MANAGE_RUN`) — User can manage or run this job.\n
+
+      * Is Owner (`IS_OWNER`) — User is the owner of this job.\n
+
+      * Can Manage (`CAN_MANAGE`) — User can manage this job. Admins are granted the Can Manage permission by default, and admins can assign that permission to non-admin users.\n
+
+      For the mapping of the required permissions for specific actions or abilities, see [Jobs access control](https://docs.microsoft.com/azure/databricks/security/access-control/jobs-acl).\n
+
+      Jobs can inherit permissions from their root object. For general information about permission inheritance, see the introduction at the top of this page."
+
+  - name: Pipeline permissions
+    description:
+      "Manage user permissions for [Delta Live Tables](https://docs.microsoft.com/azure/databricks/data-engineering/delta-live-tables/index.html) pipelines.\n
+
+      There are five permission levels for pipelines:\n
+
+      * No Permissions\n
+
+      * Can View (`CAN_VIEW`) — User can view this pipeline.\n
+
+      * Can Run (`CAN_RUN`) — User can run this pipeline.\n
+
+      * Can Manage (`CAN_MANAGE`) — User can manage this pipeline. Admins are granted the Can Manage permission by default.\n
+
+      * Is Owner (`IS_OWNER`) — User is the owner of this pipeline. Only admins can change this permission.
+        Only one user or one service principal can be granted `IS_OWNER` permission on a pipeline at a given time, and this permission cannot be granted to groups.
+        The API enforces these rules.\n
+
+      For the mapping of the required permissions for specific actions or abilities, see [Pipelines access control](https://docs.microsoft.com/azure/databricks/security/access-control/dlt-acl).\n
+
+      Pipelines can inherit permissions from their root object. For general information about permission inheritance, see the introduction at the top of this page."
+
+  - name: Notebook permissions
+    description:
+      "Manage users permissions for notebooks.\n
+
+      There are five permission levels for notebooks:\n
+
+      * No Permissions\n
+
+      * Can Read (`CAN_READ`) — User can read this notebook. With the separate Read permission, a user can run the notebook via %run or notebook workflows. See related permission Read.\n
+
+      * Can Run (`CAN_RUN`) — User can run this notebook. Note that with the separate Read permission, a user can run the notebook via %run or notebook workflows. However, with the Run permission, the user can attach and detach notebooks, or run commands.\n
+
+      * Can Edit (`CAN_EDIT`) — User can edit this notebook.\n
+
+      * Can Manage (`CAN_MANAGE`) — User can manage this job. Admins are granted the Can Manage permission by default, and admins can assign that permission to non-admin users.\n
+
+      For the mapping of the required permissions for specific actions or abilities, see [Notebook access control](https://docs.microsoft.com/azure/databricks/security/access-control/workspace-acl#notebook-permissions).\n
+
+      Notebooks inherit permissions from their root object. Additionally, notebooks inherit permissions from descendent directories, similar to how directories inherit permissions from their descendent directories. For example, a notebook with path `/Users/jsmith@example.com/myNotebook` can inherit permissions from **all** of the following objects: `/` (root directory), `/Users`, and `/Users/jsmith@example.com`. For general information about permission inheritance, see the introduction at the top of this page."
+
+  - name: Directory permissions
+    description:
+      "Manage user permissions for directories. Note that in the web application user interface and in some other documentation, directories are referred to as _folders_.\n
+
+      There are five permission levels for directories:\n
+
+      * No Permissions\n
+
+      * Can Read (`CAN_READ`) — User can read items this directory\n
+
+      * Can Run (`CAN_RUN`) — Can run items in this directory.\n
+
+      * Can Edit (`CAN_EDIT`) — Can edit items in this directory.\n
+
+      * Can Manage (`CAN_MANAGE`) — Can manage this directory.\n
+
+      **IMPORTANT:** Notebooks and experiments in a folder inherit all permissions settings of that folder. For example, a user that has Run permission on a folder has Run permission on the notebooks in that folder.\n
+
+      For the mapping of the required permissions for specific actions or abilities, see [Folder permissions](https://docs.microsoft.com/azure/databricks/security/access-control/workspace-acl#folder-permissions).\n
+
+      For directories, permissions can be inherited from all descendent directories. However, you can set permissions directly on the root directory and it has no parent, so the root directory never inherits permissions. For general information about permission inheritance, see the introduction at the top of this page."
+
+  - name: MLflow experiment permissions
+    description:
+      "Manage user permissions for MLflow experiments.\n
+
+      You can assign four permission levels to experiments:
+
+      * No Permissions\n
+
+      * Can Read (`CAN_READ`)\n
+
+      * Can Edit (`CAN_EDIT`)\n
+
+      * Can Manage (`CAN_MANAGE`)\n
+
+      For the mapping of the required permissions for specific actions or abilities, see [MLflow experiment permissions](https://docs.databricks.com/security/access-control/workspace-acl.html#mlflow-experiment-permissions-1).\n
+
+      MLflow experiments inherit permissions from their root object. For general information about permission inheritance, see the introduction at the beginning of this article. \n
+
+      For auto-generated experiments (for example, when a user runs a notebook without calling `mlflow.set_experiment()` explicitly), permissions can only be changed by using [notebook permissions](#tag/Notebook-permissions). \
+
+      For more information, see [notebook experiments](https://docs.databricks.com/applications/mlflow/tracking.html#notebook-experiments)."
+
+  - name: MLflow registered model permissions
+    description:
+      "Manage user permissions for MLflow models that are registered in the MLflow Model Registry.\n
+
+      You can assign six permission levels to registered models:
+
+      * No Permissions\n
+
+      * Can Read (`CAN_READ`)\n
+
+      * Can Edit (`CAN_EDIT`)\n
+
+      * Can Manage Staging Versions (`CAN_MANAGE_STAGING_VERSIONS`)\n
+
+      * Can Manage Production Versions (`CAN_MANAGE_PRODUCTION_VERSIONS`)\n
+
+      * Can Manage (`CAN_MANAGE`).\n
+
+      For the mapping of the required permissions for specific actions or abilities, see [MLflow model permissions](https://docs.microsoft.com/azure/databricks/security/access-control/workspace-acl#mlflow-model-permissions).\n
+
+      MLflow registered models inherit permissions from their root object. For general information about permission inheritance, see the introduction at the top of this page."
+
+  - name: SQL endpoint permissions
+    description:
+      "Manage user permissions for SQL endpoints.\n
+
+      You can assign three permission levels to registered models:
+
+      * No Permissions\n
+
+      * Can Use (`CAN_USE`)\n
+
+      * Can Manage (`CAN_MANAGE`)\n
+
+      For the mapping of the required permissions for specific actions or abilities, see [SQL endpoint permissions](https://docs.microsoft.com/azure/databricks/sql/user/security/access-control/sql-endpoint-acl#sql-endpoint-permissions)."
+
+  - name: Repo permissions
+    description:
+      "Manage user permissions for repos. \n
+
+      There are five permission levels for repos:\n
+
+      * No Permissions\n
+
+      * Can Read (`CAN_READ`) — Can read items in this repo.\n
+
+      * Can Run (`CAN_RUN`) — Can run items in this repo.\n
+
+      * Can Edit (`CAN_EDIT`) — Can edit items in this repo.\n
+
+      * Can Manage (`CAN_MANAGE`) — Can manage this repo."
+
+servers:
+  - url: https://<databricks-instance>/api/2.0
+    description: >-
+      In the URL, substitute `<databricks-instance>` with the domain name of your Azure Databricks deployment. Use the form `adb-<workspace-id>.<random-number>.azuredatabricks.net`.
+paths:
+  /permissions/authorization/tokens/permissionLevels:
+    description:
+      "This endpoint enables admins to configure permissions on the tokens object and check on which permissions levels can be set."
+    get:
+      tags:
+        - Token permissions
+      summary: Get token permission levels
+      description:
+        "Returns a JSON representation of the possible permissions levels for tokens. For details, see the [required token permission levels for various actions](#tag/Token-permissions). The results of this request do **not** change based on the state of the workspace or the permissions of the calling user. This request is published for consistency with other permissions APIs."
+      operationId: get-tokens-permission-levels
+      responses:
+        200:
+          description: Token permission levels were successfully returned.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GetTokensPermissionLevels'
+        400:
+          $ref: '#/components/responses/PermissionsBadRequest'
+        401:
+          $ref: '#/components/responses/PermissionsUnauthorized'
+        404:
+          $ref: '#/components/responses/NotFound'
+
+
+
+  /permissions/clusters/{cluster_id}/permissionLevels:
+    description:
+      "This endpoint enables admins to configure permissions on the clusters object and check on which permissions levels can be set."
+    parameters:
+      - name: cluster_id
+        in: path
+        schema:
+          type: string
+        description: The ID of the cluster.
+        required: true
+    get:
+      tags:
+        - Cluster permissions
+      summary: Get cluster permission levels
+      description:
+        "Returns a JSON representation of the possible permissions levels for clusters."
+      operationId: get-clusters-permission-levels
+      responses:
+        200:
+          description: Cluster permission levels were successfully returned.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GetClustersPermissionLevels'
+        400:
+          $ref: '#/components/responses/PermissionsBadRequest'
+        401:
+          $ref: '#/components/responses/PermissionsUnauthorized'
+        404:
+          $ref: '#/components/responses/NotFound'
+
+  /permissions/instance-pools/{instance_pool_id}/permissionLevels:
+    description:
+      "This endpoint enables admins to configure permissions on the pool object and check on which permissions levels can be set."
+    parameters:
+      - name: instance_pool_id
+        in: path
+        schema:
+          type: string
+        description: The ID of a pool
+        required: true
+    get:
+      tags:
+        - Pool permissions
+      summary: Get pool permission levels
+      description:
+        "Returns a JSON representation of the possible permissions levels for pools."
+      operationId: get-instance-pools-permission-levels
+      responses:
+        200:
+          description: Pool permission levels were successfully returned.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GetInstancePoolsPermissionLevels'
+        400:
+          $ref: '#/components/responses/PermissionsBadRequest'
+        401:
+          $ref: '#/components/responses/PermissionsUnauthorized'
+        404:
+          $ref: '#/components/responses/NotFound'
+
+  /permissions/jobs/{job_id}/permissionLevels:
+    description:
+      "This endpoint enables admins to configure permissions on the jobs object and check on which permissions levels can be set."
+    parameters:
+      - name: job_id
+        in: path
+        schema:
+          type: string
+        description: The ID of the job to get permission levels on.
+        required: true
+    get:
+      tags:
+        - Job permissions
+      summary: Get job permission levels
+      description:
+        "Returns a JSON representation of the possible permissions levels for jobs."
+      operationId: get-jobs-permission-levels
+      responses:
+        200:
+          description: Job permission levels were successfully returned.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GetJobsPermissionLevels'
+        400:
+          $ref: '#/components/responses/PermissionsBadRequest'
+        401:
+          $ref: '#/components/responses/PermissionsUnauthorized'
+        404:
+          $ref: '#/components/responses/NotFound'
+
+  /permissions/pipelines/{pipeline_id}/permissionLevels:
+    description:
+      "This endpoint returns a list of the possible permission levels that can be set for a pipeline."
+    parameters:
+      - name: pipeline_id
+        in: path
+        schema:
+          type: string
+        description: The ID of the pipeline to get possible permission levels on.
+        required: true
+    get:
+      tags:
+        - Pipeline permissions
+      summary: Get pipeline permission levels
+      description:
+        "Returns a JSON representation of the possible permissions levels for pipelines."
+      operationId: get-pipelines-permission-levels
+      responses:
+        200:
+          description: Pipeline permission levels were successfully returned.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GetPipelinesPermissionLevels'
+        400:
+          $ref: '#/components/responses/PermissionsBadRequest'
+        401:
+          $ref: '#/components/responses/PermissionsUnauthorized'
+        404:
+          $ref: '#/components/responses/NotFound'
+
+  /permissions/notebooks/{notebook_id}/permissionLevels:
+    description:
+      "This endpoint enables admins to configure permissions on the notebooks object and check on which permissions levels can be set."
+
+    parameters:
+      - name: notebook_id
+        in: path
+        schema:
+          type: string
+        description: The ID of the notebook to get permission levels on.
+        required: true
+    get:
+      tags:
+        - Notebook permissions
+      summary: Get notebook permission levels
+      description:
+        "Returns a JSON representation of the possible permissions levels for notebooks."
+      operationId: get-notebooks-permission-levels
+      responses:
+        200:
+          description: Notebook permission levels were successfully returned.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GetNotebooksPermissionLevels'
+        400:
+          $ref: '#/components/responses/PermissionsBadRequest'
+        401:
+          $ref: '#/components/responses/PermissionsUnauthorized'
+        404:
+          $ref: '#/components/responses/NotFound'
+
+  /permissions/directories/{directory_id}/permissionLevels:
+    description:
+      "This endpoint enables admins to configure permissions on the directories object and check on which permissions levels can be set."
+    parameters:
+      - name: directory_id
+        in: path
+        schema:
+          type: string
+        description: The ID of the directory to get permission levels on.
+        required: true
+    get:
+      tags:
+        - Directory permissions
+      summary: Get directory permission levels
+      description:
+        "Returns a JSON representation of the possible permissions levels for directories."
+      operationId: get-directories-permission-levels
+      responses:
+        200:
+          description: Directory permission levels were successfully returned.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GetDirectoriesPermissionLevels'
+        400:
+          $ref: '#/components/responses/PermissionsBadRequest'
+        401:
+          $ref: '#/components/responses/PermissionsUnauthorized'
+        404:
+          $ref: '#/components/responses/NotFound'
+
+  /permissions/experiments/{experiment_id}/permissionLevels:
+    description:
+      "This endpoint enables admins to configure permissions for experiments and to check the permission levels that can be set."
+    parameters:
+      - name: experiment_id
+        in: path
+        schema:
+          type: string
+        description: The ID of the experiment to get permission levels.
+        required: true
+    get:
+      tags:
+        - MLflow experiment permissions
+      summary: Get experiment permission levels
+      description:
+        "Returns a JSON representation of the possible permission levels for experiments."
+      operationId: get-experiment-permission-levels
+      responses:
+        200:
+          description: Experiment permission levels were successfully returned.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GetExperimentsPermissionLevels'
+        400:
+          $ref: '#/components/responses/PermissionsBadRequest'
+        401:
+          $ref: '#/components/responses/PermissionsUnauthorized'
+        404:
+          $ref: '#/components/responses/NotFound'
+
+  /permissions/registered-models/{registered_model_id}/permissionLevels:
+    description:
+      "This endpoint enables admins to configure permissions on the registered model object and check on which permissions levels can be set."
+    parameters:
+      - name: registered_model_id
+        in: path
+        schema:
+          type: string
+        description:
+          "The ID of the MLflow registered model to get permission levels on. To get the ID of a registered model, use the related MLflow API `/mlflow/databricks/registered-models/get` with a GET request to get a list of models and their IDs."
+        required: true
+    get:
+      tags:
+        - MLflow registered model permissions
+      summary: Get MLflow registered model permission levels
+      description:
+        "Returns a JSON representation of the possible permissions levels for MLflow registered models."
+      operationId: get-registered-models-permission-levels
+      responses:
+        200:
+          description: Registered model permission levels were successfully returned.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GetRegisteredModelsPermissionLevels'
+        400:
+          $ref: '#/components/responses/PermissionsBadRequest'
+        401:
+          $ref: '#/components/responses/PermissionsUnauthorized'
+        404:
+          $ref: '#/components/responses/NotFound'
+
+  /permissions/sql/endpoints/{endpoint_id}/permissionLevels:
+    description:
+      "This endpoint enables admins to configure permissions on the SQL endpoint object and check on which permissions levels can be set."
+    parameters:
+      - name: endpoint_id
+        in: path
+        schema:
+          type: string
+        description: The ID of the SQL endpoint to get permission levels on.
+        required: true
+    get:
+      tags:
+        - SQL endpoint permissions
+      summary: Get SQL endpoint permission levels
+      description:
+        "Returns a JSON representation of the possible permissions levels for SQL endpoints."
+      operationId: get-sqlendpoint-permission-levels
+      responses:
+        200:
+          description: SQL endpoint permission levels were successfully returned.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GetSqlEndpointsPermissionLevels'
+        400:
+          $ref: '#/components/responses/PermissionsBadRequest'
+        401:
+          $ref: '#/components/responses/PermissionsUnauthorized'
+        404:
+          $ref: '#/components/responses/NotFound'
+  /permissions/repos/{repo_id}/permissionLevels:
+    description:
+      "This endpoint enables admins to configure permissions on the repo object and check on which permissions levels can be set."
+    parameters:
+      - name: repo_id
+        in: path
+        schema:
+          type: string
+        description: The ID of the repo to get permission levels on.
+        required: true
+    get:
+      tags:
+        - Repo permissions
+      summary: Get repo permission levels
+      description:
+        "Returns a JSON representation of the possible permissions levels for repos."
+      operationId: get-repos-permission-levels
+      responses:
+        200:
+          description: Repo permission levels were successfully returned.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GetReposPermissionLevels'
+        400:
+          $ref: '#/components/responses/PermissionsBadRequest'
+        401:
+          $ref: '#/components/responses/PermissionsUnauthorized'
+        404:
+          $ref: '#/components/responses/NotFound'
+
+  /permissions/authorization/tokens:
+    description:
+      "This endpoint enables admins to get and set permissions on the tokens object, which indicates who can use tokens."
+    get:
+      tags:
+        - Token permissions
+      summary: Get all token permissions for the workspace
+      operationId: get-tokens-permissions
+      description:
+        "Get the set of all token permissions for the workspace. For an overview, see the [introduction to token permissions](#tag/Token-permissions)."
+      responses:
+        200:
+          description: Tokens were successfully returned.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GetTokensPermissionResponse'
+        400:
+          $ref: '#/components/responses/PermissionsBadRequest'
+        401:
+          $ref: '#/components/responses/PermissionsUnauthorized'
+        404:
+          $ref: '#/components/responses/NotFound'
+
+    patch:
+      tags:
+        - Token permissions
+      summary: Update token permissions for a specific entity
+      operationId: set-tokens-permissions
+      description:
+        "Grant token permissions for one or more users, groups, or service principals. You can only grant the Can Use (`CAN_USE`) permission. The Can Manage (`CAN_MANAGE`) permission level cannot be granted with this API because it is tied automatically to membership in the `admins` group.\n
+
+        **IMPORTANT:** You cannot use this request to revoke (remove) any permissions. The only way to remove permissions is with the [replace token permissions for entire workspace API](#operation/update-tokens-permissions), which requires you specify the complete set of permissions for all objects that are granted permissions.\n
+
+        To grant Can Use permission, in the `access_control_list` array in the request body, create an array element for the target object and set its name property (varies by object type) and `permission_level` property to `CAN_USE`.\n
+
+        To update and replace permissions for all entities for the entire workspace, see [replace token permissions for entire workspace](#operation/update-tokens-permissions).\n
+
+        For an overview, see the [introduction to token permissions](#tag/Token-permissions)."
+
+      requestBody:
+        description: >-
+          Details that are required to update token permissions for a specific user, group, or service principal.
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchTokenPermissionRequest'
+      responses:
+        200:
+          description: The token permissions for specified entities were successfully updated.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GetTokensPermissionResponse'
+        400:
+          $ref: '#/components/responses/PermissionsBadRequest'
+        401:
+          $ref: '#/components/responses/PermissionsUnauthorized'
+        404:
+          $ref: '#/components/responses/NotFound'
+
+    put:
+      tags:
+        - Token permissions
+      summary: Replace all token permissions for workspace, revoking tokens for users that no longer have permissions
+      operationId: update-tokens-permissions
+      description:
+        "Update all token permissions for all users, groups, and service principals for the entire workspace. The permissions that you specify in this request overwrite the existing permissions entirely. You must provide a complete set of all permissions for all objects in one request.\n
+
+        At the end of processing your request, all users and service principals that do not have either `CAN_USE` or `CAN_MANAGE` permission either explicitly or implicitly due to group assignment no longer have any tokens permissions. Affected users or service principals immediately have all their tokens deleted.\n
+
+        Notes about the special two built-in groups:\n
+
+        * For workspaces created after the release of <Databricks> platform version 3.28 (Sept 9-15, 2020) the default is for no users to have the Can Use permission. Admins must explicitly grant those permissions, whether to the entire `users` group or on a user-by-user or group-by-group basis. **Important:** Workspaces created before 3.28 was released will maintain the permissions that were already in place. The default was for all users to have the Can Use permission. Admins can revoke that group permission assignment and add it to other groups or to individual non-admin users.
+
+        * You are required to grant the administrators group (group `admins`) the `CAN_MANAGE` permission. It is unsupported to grant this permission to any other entities.
+
+        **WARNING:** This request has powerful effects for workspace security configuration and on a workspace's users if they already use tokens. Use with caution. This request overwrites all existing token permissions with the data in the request body. By omitting reference to an entity that previously had permissions, access is stripped and existing tokens are permanently deleted.\n
+
+        To grant token permissions for one specific entity rather than the entire workspace, instead see [update tokens permissions for a specific object](#operation/set-tokens-permissions). That API can only add permissions, not revoke permissions.\n
+
+        For an overview, see the [introduction to token permissions](#tag/Token-permissions)."
+      requestBody:
+        description:
+          "Details required to reset permissions on tokens. This overwrites all existing permissions on tokens and replace it with the new permissions specified in the request body.\n
+
+          **WARNING:** This request has powerful effects for workspace security and on a workspace's users. Use with caution. This overwrites all existing token permissions with the data in the request body. By omitting reference to an entity that previously had permissions, access is stripped and existing tokens are permanently deleted."
+
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PutTokenPermissionRequest'
+      responses:
+        200:
+          description: The permissions for the workspace were successfully updated.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GetTokensPermissionResponse'
+        400:
+          $ref: '#/components/responses/PermissionsBadRequest'
+        401:
+          $ref: '#/components/responses/PermissionsUnauthorized'
+        404:
+          $ref: '#/components/responses/NotFound'
+
+  /permissions/clusters/{cluster_id}:
+    description:
+      "This endpoint enables admins to configure permissions on the clusters object."
+    parameters:
+      - name: cluster_id
+        in: path
+        schema:
+          type: string
+        description: The ID of the cluster.
+        required: true
+    get:
+      tags:
+        - Cluster permissions
+      summary: Get cluster permissions
+      operationId: get-cluster-permissions
+      responses:
+        200:
+          description: Permissions for the cluster were successfully returned.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GetClustersPermissionResponse'
+        400:
+          $ref: '#/components/responses/PermissionsBadRequest'
+        401:
+          $ref: '#/components/responses/PermissionsUnauthorized'
+        404:
+          $ref: '#/components/responses/NotFound'
+
+    patch:
+      tags:
+        - Cluster permissions
+      summary: Update cluster permissions for a specific entity
+      operationId: set-cluster-permissions
+      description:
+        "Grant cluster permissions for one or more users, groups, or service principals.\n
+
+        This request only grants (adds) permissions. To revoke, use the [replace all cluster permissions](#operation/update-all-cluster-permissions) operation."
+
+      requestBody:
+        description: >-
+          Details that are required to update cluster permissions for a specific user, group, or service principal.
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchClustersPermissionRequest'
+      responses:
+        200:
+          description: The cluster permissions for specified items were successfully updated.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GetClustersPermissionResponse'
+        400:
+          $ref: '#/components/responses/PermissionsBadRequest'
+        401:
+          $ref: '#/components/responses/PermissionsUnauthorized'
+        404:
+          $ref: '#/components/responses/NotFound'
+
+    put:
+      tags:
+        - Cluster permissions
+      summary: Replace cluster permissions
+      operationId: update-all-cluster-permissions
+      description:
+        "Update all clusters permissions for a specific cluster, specifying all users, groups, or  service principal.\n
+
+        **WARNING:** This request overwrites all existing direct (non-inherited) permissions on the cluster and replaces it with the new permissions specified in the request body."
+      requestBody:
+        description:
+          "Details required to replace all permissions on a cluster."
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PutClustersPermissionRequest'
+      responses:
+        200:
+          description: The permissions for the cluster were successfully updated.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GetClustersPermissionResponse'
+        400:
+          $ref: '#/components/responses/PermissionsBadRequest'
+        401:
+          $ref: '#/components/responses/PermissionsUnauthorized'
+        404:
+          $ref: '#/components/responses/NotFound'
+
+  /permissions/instance-pools/{instance_pool_id}:
+    description:
+      "This endpoint enables admins to configure permissions on the clusters object."
+    parameters:
+      - name: instance_pool_id
+        in: path
+        schema:
+          type: string
+        description: The ID of a pool.
+        required: true
+    get:
+      tags:
+        - Pool permissions
+      summary: Get Pool permissions
+      operationId: get-instance-pool-permissions
+      description:
+        "Get permissions for a specific pool. "
+      responses:
+        200:
+          description: Permissions for the pool were successfully returned.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GetInstancePoolsPermissionResponse'
+        400:
+          $ref: '#/components/responses/PermissionsBadRequest'
+        401:
+          $ref: '#/components/responses/PermissionsUnauthorized'
+        404:
+          $ref: '#/components/responses/NotFound'
+
+    patch:
+      tags:
+        - Pool permissions
+      summary: Update pool permissions for a specific entity
+      operationId: set-instance-pool-permissions
+      description:
+        "Grant pool permissions for one or more users, groups, or service principal.\n
+
+        This request only grants (adds) permissions. To revoke, use the [replace all pool permissions](#operation/update-all-instance-pool-permissions) operation."
+
+      requestBody:
+        description: >-
+          Details that are required to update cluster permissions for a specific user, group, or service principal.
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchInstancePoolsPermissionRequest'
+      responses:
+        200:
+          description: The pool permissions were updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GetInstancePoolsPermissionResponse'
+        400:
+          $ref: '#/components/responses/PermissionsBadRequest'
+        401:
+          $ref: '#/components/responses/PermissionsUnauthorized'
+        404:
+          $ref: '#/components/responses/NotFound'
+
+    put:
+      tags:
+        - Pool permissions
+      summary: Replace all pool permissions
+      operationId: update-all-instance-pool-permissions
+      description:
+        "Update all pool permissions for all users, groups, or service principal for a specific pool.\n
+
+        **WARNING:** This request overwrites all existing permissions on the pool and replaces it with the new permissions specified in the request body."
+      requestBody:
+        description:
+          "Details required to replace all permissions on a pool."
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PutInstancePoolsPermissionRequest'
+      responses:
+        200:
+          description: The permissions for the workspace were successfully updated.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GetInstancePoolsPermissionResponse'
+        400:
+          $ref: '#/components/responses/PermissionsBadRequest'
+        401:
+          $ref: '#/components/responses/PermissionsUnauthorized'
+        404:
+          $ref: '#/components/responses/NotFound'
+
+  /permissions/jobs/{job_id}:
+    description:
+      "This endpoint enables admins to configure permissions on the jobs object."
+    parameters:
+      - name: job_id
+        in: path
+        schema:
+          type: string
+        description: The ID of the job to get permission levels on.
+        required: true
+    get:
+      tags:
+        - Job permissions
+      summary: Get job permissions
+      operationId: get-job-permissions
+      responses:
+        200:
+          description: Permissions for the job were successfully returned.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GetJobsPermissionResponse'
+        400:
+          $ref: '#/components/responses/PermissionsBadRequest'
+        401:
+          $ref: '#/components/responses/PermissionsUnauthorized'
+        404:
+          $ref: '#/components/responses/NotFound'
+
+    patch:
+      tags:
+        - Job permissions
+      summary: Update job permissions for a specific entity
+      operationId: set-job-permissions
+      description:
+        "Grant jobs permissions for one or more users, groups, or service principals.\n
+
+        This request only grants (adds) permissions. To revoke, use the [replace all job permissions](#operation/update-all-job-permissions) operation."
+
+      requestBody:
+        description: >-
+          Details that are required to update jobs permissions for a specific user, group, or service principal.
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchJobsPermissionRequest'
+      responses:
+        200:
+          description: The job permissions for specified items were successfully updated.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GetJobsPermissionResponse'
+        400:
+          $ref: '#/components/responses/PermissionsBadRequest'
+        401:
+          $ref: '#/components/responses/PermissionsUnauthorized'
+        404:
+          $ref: '#/components/responses/NotFound'
+
+    put:
+      tags:
+        - Job permissions
+      summary: Replace specific job permissions
+      operationId: update-all-job-permissions
+      description:
+        "Update all jobs permissions for all users, groups, or service principal for a specific job.\n
+
+        **WARNING:** This request overwrites all existing direct permissions on the job and replaces it with the new permissions specified in the request body."
+
+      requestBody:
+        description:
+          "Details required to replace all permissions on a job."
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PutJobsPermissionRequest'
+      responses:
+        200:
+          description: The permissions for the workspace were updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GetJobsPermissionResponse'
+        400:
+          $ref: '#/components/responses/PermissionsBadRequest'
+        401:
+          $ref: '#/components/responses/PermissionsUnauthorized'
+        404:
+          $ref: '#/components/responses/NotFound'
+
+  /permissions/pipelines/{pipeline_id}:
+    get:
+      tags:
+        - Pipeline permissions
+      summary: Get pipeline permissions
+      operationId: get-pipeline-permissions
+      description:
+        "Get the set of all permissions granted to users, groups, and service principals on a pipeline."
+      parameters:
+        - name: pipeline_id
+          in: path
+          schema:
+            type: string
+          description: The ID of the pipeline to get permission levels on.
+          required: true
+      responses:
+        200:
+          description: Permissions for the pipeline were successfully returned.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GetPipelinesPermissionResponse'
+        400:
+          $ref: '#/components/responses/PermissionsBadRequest'
+        401:
+          $ref: '#/components/responses/PermissionsUnauthorized'
+        404:
+          $ref: '#/components/responses/NotFound'
+
+    patch:
+      tags:
+        - Pipeline permissions
+      summary: Update pipeline permissions for a specific entity
+      operationId: set-pipeline-permissions
+      description:
+        "Grant permissions on a pipeline for one or more users, groups, or service principals.\n
+
+        This request only grants (adds) permissions. To revoke, use the [replace all pipeline permissions](#operation/update-all-pipeline-permissions) operation."
+      parameters:
+        - name: pipeline_id
+          in: path
+          schema:
+            type: string
+          description: The ID of the pipeline to configure permission levels on.
+          required: true
+      requestBody:
+        description: >-
+          Details that are required to update pipeline permissions for a specific user, group, or service principal.
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchPipelinesPermissionRequest'
+      responses:
+        200:
+          description: The permissions for specified pipelines were successfully updated.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GetPipelinesPermissionResponse'
+        400:
+          $ref: '#/components/responses/PermissionsBadRequest'
+        401:
+          $ref: '#/components/responses/PermissionsUnauthorized'
+        404:
+          $ref: '#/components/responses/NotFound'
+
+    put:
+      tags:
+        - Pipeline permissions
+      summary: Replace specific pipeline permissions
+      operationId: update-all-pipeline-permissions
+      description:
+        "Update permissions granted to users, groups and service principals on the specified pipeline.\n
+
+        **WARNING:** This request overwrites all existing direct (non-inherited) permissions on the pipeline and replaces it with the new permissions specified in the request body."
+      parameters:
+        - name: pipeline_id
+          in: path
+          schema:
+            type: string
+          description: The ID of the pipeline to configure permission levels on.
+          required: true
+      requestBody:
+        description:
+          "Details required to replace all permissions on a pipeline."
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PutPipelinesPermissionRequest'
+      responses:
+        200:
+          description: The permissions for the pipeline were updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GetPipelinesPermissionResponse'
+        400:
+          $ref: '#/components/responses/PermissionsBadRequest'
+        401:
+          $ref: '#/components/responses/PermissionsUnauthorized'
+        404:
+          $ref: '#/components/responses/NotFound'
+
+  /permissions/notebooks/{notebook_id}:
+    description:
+      "This endpoint enables admins to configure permissions on the notebooks object."
+    parameters:
+      - name: notebook_id
+        in: path
+        schema:
+          type: string
+        description: The ID of the notebook to get permission levels on.
+        required: true
+    get:
+      tags:
+        - Notebook permissions
+      summary: Get notebook permissions
+      operationId: get-notebook-permissions
+      responses:
+        200:
+          description: Permissions for the notebook were successfully returned.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GetNotebooksPermissionResponse'
+        400:
+          $ref: '#/components/responses/PermissionsBadRequest'
+        401:
+          $ref: '#/components/responses/PermissionsUnauthorized'
+        404:
+          $ref: '#/components/responses/NotFound'
+
+    patch:
+      tags:
+        - Notebook permissions
+      summary: Update notebook permissions for a specific entity
+      operationId: set-notebook-permissions
+      description:
+        "Grant a notebook new permissions for one or more users, groups, or service principals.\n
+
+        This request only grants (adds) permissions. To revoke, use the [replace all notebook permissions](#operation/update-all-notebook-permissions) operation."
+      requestBody:
+        description: >-
+          Details that are required to update notebook permissions for a specific user, group, or service principal.
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchNotebooksPermissionRequest'
+      responses:
+        200:
+          description: The notebook permissions for specified items were updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GetNotebooksPermissionResponse'
+        400:
+          $ref: '#/components/responses/PermissionsBadRequest'
+        401:
+          $ref: '#/components/responses/PermissionsUnauthorized'
+        404:
+          $ref: '#/components/responses/NotFound'
+
+    put:
+      tags:
+        - Notebook permissions
+      summary: Replace all notebook permissions
+      operationId: update-all-notebook-permissions
+      description:
+        "Update all notebooks permissions for all users, groups, or service principal for a specific notebook.\n
+
+        **WARNING:** This request overwrites all existing direct permissions on the notebook and replaces it with the new permissions specified in the request body."
+
+      requestBody:
+        description:
+          "Details required to reset permissions on a notebook."
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PutNotebooksPermissionRequest'
+      responses:
+        200:
+          description: The permissions for the notebook were successfully updated.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GetNotebooksPermissionResponse'
+        400:
+          $ref: '#/components/responses/PermissionsBadRequest'
+        401:
+          $ref: '#/components/responses/PermissionsUnauthorized'
+        404:
+          $ref: '#/components/responses/NotFound'
+
+  /permissions/directories/{directory_id}:
+    description:
+      "This endpoint enables admins to configure permissions on the directories object."
+    parameters:
+      - name: directory_id
+        in: path
+        schema:
+          type: string
+        description: The ID of the directory to get permission levels on.
+        required: true
+    get:
+      tags:
+        - Directory permissions
+      summary: Get directory permissions
+      operationId: get-directory-permissions
+      description:
+        "Get directory permissions for a specific directory."
+      responses:
+        200:
+          description: Permissions for the directory were successfully returned.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GetDirectoriesPermissionResponse'
+        400:
+          $ref: '#/components/responses/PermissionsBadRequest'
+        401:
+          $ref: '#/components/responses/PermissionsUnauthorized'
+        404:
+          $ref: '#/components/responses/NotFound'
+
+    patch:
+      tags:
+        - Directory permissions
+      summary: Update directories permissions for a specific entity
+      operationId: set-directory-permissions
+      description:
+        "Grant a directory new permissions for one or more users, groups, or service principals.\n
+
+        This request only grants (adds) permissions. To revoke, use the [replace all directory permissions](#operation/update-all-directory-permissions) operation."
+      requestBody:
+        description: >-
+          Details that are required to update directories permissions for a specific user, group, or service principal.
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchDirectoriesPermissionRequest'
+      responses:
+        200:
+          description: The directory permissions for specified items were successfully updated.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GetDirectoriesPermissionResponse'
+        400:
+          $ref: '#/components/responses/PermissionsBadRequest'
+        401:
+          $ref: '#/components/responses/PermissionsUnauthorized'
+        404:
+          $ref: '#/components/responses/NotFound'
+
+    put:
+      tags:
+        - Directory permissions
+      summary: Replace all directory permissions
+      operationId: update-all-directory-permissions
+      description:
+        "Update all directory permissions for all users, groups, or service principal for a specific directory.\n
+
+        **WARNING:** This request overwrites all existing direct permissions on the directory and replaces it with the new permissions specified in the request body."
+      requestBody:
+        description:
+          "Details required to replace all permissions on a directory."
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PutDirectoriesPermissionRequest'
+      responses:
+        200:
+          description: The permissions for the directory were successfully updated.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GetDirectoriesPermissionResponse'
+        400:
+          $ref: '#/components/responses/PermissionsBadRequest'
+        401:
+          $ref: '#/components/responses/PermissionsUnauthorized'
+        404:
+          $ref: '#/components/responses/NotFound'
+
+  /permissions/experiments/{experiment_id}:
+    description:
+      "This endpoint enables admins to configure permissions on the experiment."
+    parameters:
+      - name: experiment_id
+        in: path
+        schema:
+          type: string
+        description: The ID of the experiment to get permission levels.
+        required: true
+    get:
+      tags:
+        - MLflow experiment permissions
+      summary: Get experiment permissions
+      operationId: get-experiment-permissions
+      responses:
+        200:
+          description: Permissions for the experiment were successfully returned.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GetExperimentsPermissionResponse'
+        400:
+          $ref: '#/components/responses/PermissionsBadRequest'
+        401:
+          $ref: '#/components/responses/PermissionsUnauthorized'
+        404:
+          $ref: '#/components/responses/NotFound'
+
+    patch:
+      tags:
+        - MLflow experiment permissions
+      summary: Update experiment permissions for a specific entity
+      operationId: set-experiment-permissions
+      description:
+        "Grant an experiment new permissions for one or more users, groups, or service principals.\n
+
+        This request only grants (adds) permissions. To revoke, use the [replace all experiment permissions](#operation/update-all-experiment-permissions) operation."
+      requestBody:
+        description: >-
+          Details that are required to update experiment permissions for a specific user, group, or service principal.
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchExperimentsPermissionRequest'
+      responses:
+        200:
+          description: The experiment permissions for specified items were updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GetExperimentsPermissionResponse'
+        400:
+          $ref: '#/components/responses/PermissionsBadRequest'
+        401:
+          $ref: '#/components/responses/PermissionsUnauthorized'
+        404:
+          $ref: '#/components/responses/NotFound'
+
+    put:
+      tags:
+        - MLflow experiment permissions
+      summary: Replace all experiment permissions
+      operationId: update-all-experiment-permissions
+      description:
+        "Update all experiment permissions for all users, groups or service principal for a specific experiment.\n
+
+        **WARNING:** This request overwrites all existing direct permissions on the experiment and replaces it with the new permissions specified in the request body."
+
+      requestBody:
+        description:
+          "Details required to reset permissions on a experiment."
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PutExperimentsPermissionRequest'
+      responses:
+        200:
+          description: The permissions for the experiment were successfully updated.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GetExperimentsPermissionResponse'
+        400:
+          $ref: '#/components/responses/PermissionsBadRequest'
+        401:
+          $ref: '#/components/responses/PermissionsUnauthorized'
+        404:
+          $ref: '#/components/responses/NotFound'
+
+  /permissions/registered-models/{registered_model_id}:
+    description:
+      "This endpoint enables admins to configure permissions on the registered models object."
+    parameters:
+      - name: registered_model_id
+        in: path
+        schema:
+          type: string
+        description:
+          "The ID of the MLflow registered model to get permission levels on. To get the ID of a registered model, use the related MLflow API `/mlflow/databricks/registered-models/get` with a GET request to get a list of models and their IDs."
+        required: true
+    get:
+      tags:
+        - MLflow registered model permissions
+      summary: Get MLflow registered model permissions
+      operationId: get-registered-model-permissions
+      description:
+        "Get permissions for a specific MLflow registered model."
+      responses:
+        200:
+          description: Permissions for the registered model were successfully returned.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GetRegisteredModelsPermissionResponse'
+        400:
+          $ref: '#/components/responses/PermissionsBadRequest'
+        401:
+          $ref: '#/components/responses/PermissionsUnauthorized'
+        404:
+          $ref: '#/components/responses/NotFound'
+
+    patch:
+      tags:
+        - MLflow registered model permissions
+      summary: Update MLflow registered model permissions for a specific entity
+      operationId: set-registered-model-permissions
+      description:
+        "Grant MLflow registered model permissions for one or more users, groups, or service principals."
+      requestBody:
+        description: >-
+          Details that are required to update MLflow registered model permissions for a specific user, group, or service principal.
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchRegisteredModelsPermissionRequest'
+      responses:
+        200:
+          description: The registered model permissions for specified items were updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GetRegisteredModelsPermissionResponse'
+        400:
+          $ref: '#/components/responses/PermissionsBadRequest'
+        401:
+          $ref: '#/components/responses/PermissionsUnauthorized'
+        404:
+          $ref: '#/components/responses/NotFound'
+
+    put:
+      tags:
+        - MLflow registered model permissions
+      summary: Replace all MLflow registered model permissions
+      operationId: update-registered-model-permissions
+      description:
+        "Update all MLflow registered model permissions for all users, groups, or service principal for a specific registered model.\n
+
+        **WARNING:** This request overwrites all existing direct permissions on the registered model and replaces it with the new permissions specified in the request body."
+
+      requestBody:
+        description:
+          "Details required to replace all permissions on a registered model."
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PutRegisteredModelsPermissionRequest'
+      responses:
+        200:
+          description: The permissions for the registered model were successfully updated.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GetRegisteredModelsPermissionResponse'
+        400:
+          $ref: '#/components/responses/PermissionsBadRequest'
+        401:
+          $ref: '#/components/responses/PermissionsUnauthorized'
+        404:
+          $ref: '#/components/responses/NotFound'
+  /permissions/sql/endpoints/{endpoint_id}:
+    description:
+      "This endpoint enables admins to configure permissions on the SQL endpoint object."
+    parameters:
+      - name: endpoint_id
+        in: path
+        schema:
+          type: string
+        description: The ID of the SQL endpoint to get permission levels on.
+        required: true
+    get:
+      tags:
+        - SQL endpoint permissions
+      summary: Get SQL endpoint permissions
+      operationId: get-sqlendpoint-permissions
+      responses:
+        200:
+          description: Permissions for the SQL endpoints were successfully returned.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GetSqlEndpointsPermissionResponse'
+        400:
+          $ref: '#/components/responses/PermissionsBadRequest'
+        401:
+          $ref: '#/components/responses/PermissionsUnauthorized'
+        404:
+          $ref: '#/components/responses/NotFound'
+
+    patch:
+      tags:
+        - SQL endpoint permissions
+      summary: Update SQL endpoint permissions for a specific entity
+      operationId: set-sqlendpoint-permissions
+      description:
+        "Grant SQL endpoint permissions for one or more users, groups, or service principals.\n
+
+        This request only grants (adds) permissions. To revoke, use the [replace all SQL endpoint permissions](#operation/update-all-sqlendpoint-permissions) operation."
+
+      requestBody:
+        description: >-
+          Details that are required to update SQL endpoint permissions for a specific user, group or service principal.
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchSqlEndpointsPermissionRequest'
+      responses:
+        200:
+          description: The SQL endpoint permissions for specified items were successfully updated.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GetSqlEndpointsPermissionResponse'
+        400:
+          $ref: '#/components/responses/PermissionsBadRequest'
+        401:
+          $ref: '#/components/responses/PermissionsUnauthorized'
+        404:
+          $ref: '#/components/responses/NotFound'
+
+    put:
+      tags:
+        - SQL endpoint permissions
+      summary: Replace SQL endpoint permissions
+      operationId: update-all-sqlendpoint-permissions
+      description:
+        "Update all permissions for a specific SQL endpoint, specifying all users, groups or service principal.\n
+
+        **WARNING:** This request overwrites all existing direct (non-inherited) permissions on the SQL endpoint and replaces it with the new permissions specified in the request body."
+      requestBody:
+        description:
+          "Details required to replace all permissions on a SQL endpoint."
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PutSqlEndpointsPermissionRequest'
+      responses:
+        200:
+          description: The permissions for the SQL endpoint were successfully updated.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GetSqlEndpointsPermissionResponse'
+        400:
+          $ref: '#/components/responses/PermissionsBadRequest'
+        401:
+          $ref: '#/components/responses/PermissionsUnauthorized'
+        404:
+          $ref: '#/components/responses/NotFound'
+
+  /permissions/repos/{repo_id}:
+    description:
+      "This endpoint enables admins to configure permissions on the repos object."
+    parameters:
+      - name: repo_id
+        in: path
+        schema:
+          type: string
+        description: The ID of the repo to get permission levels on.
+        required: true
+    get:
+      tags:
+        - Repo permissions
+      summary: Get repo permissions
+      operationId: get-repo-permissions
+      responses:
+        200:
+          description: Permissions for the repo were successfully returned.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GetReposPermissionResponse'
+        400:
+          $ref: '#/components/responses/PermissionsBadRequest'
+        401:
+          $ref: '#/components/responses/PermissionsUnauthorized'
+        404:
+          $ref: '#/components/responses/NotFound'
+
+    patch:
+      tags:
+        - Repo permissions
+      summary: Update repo permissions for a specific entity
+      operationId: set-repo-permissions
+      description:
+        "Grant a repo new permissions for one or more users, groups, or service principals.\n
+
+        This request only grants (adds) permissions. To revoke, use the [replace all repo permissions](#operation/update-all-repo-permissions) operation."
+      requestBody:
+        description: >-
+          Details that are required to update repo permissions for a specific user, group, or service principal.
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchReposPermissionRequest'
+      responses:
+        200:
+          description: The repo permissions for specified items were updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GetReposPermissionResponse'
+        400:
+          $ref: '#/components/responses/PermissionsBadRequest'
+        401:
+          $ref: '#/components/responses/PermissionsUnauthorized'
+        404:
+          $ref: '#/components/responses/NotFound'
+
+    put:
+      tags:
+        - Repo permissions
+      summary: Replace all repo permissions
+      operationId: update-all-repo-permissions
+      description:
+        "Update all repos permissions for all users, groups or service principal for a specific repo.\n
+
+        **WARNING:** This request overwrites all existing direct permissions on the repo and replaces it with the new permissions specified in the request body."
+
+      requestBody:
+        description:
+          "Details required to reset permissions on a repo."
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PutReposPermissionRequest'
+      responses:
+        200:
+          description: The permissions for the repo were successfully updated.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GetReposPermissionResponse'
+        400:
+          $ref: '#/components/responses/PermissionsBadRequest'
+        401:
+          $ref: '#/components/responses/PermissionsUnauthorized'
+        404:
+          $ref: '#/components/responses/NotFound'
+
+components:
+  schemas:
+    object_id:
+      type: string
+      enum:
+        - authorization/tokens
+      description: Always the value `authorization/tokens`. This field is returned for consistency with other Databricks object permissions APIs.
+      example: "authorization/tokens"
+    object_type:
+      type: string
+      enum:
+        - tokens
+      description: Always the value `tokens`. This field is returned for consistency with other Databricks object permissions APIs.
+      example: "tokens"
+
+    clusters_object_id:
+      type: string
+      description: /\<object_type\>/\<object_id\>  is returned here for consistency with other Databricks object permissions APIs.
+      example: "/clusters/0712-200003-rail519"
+    clusters_object_type:
+      type: string
+      enum:
+        - cluster
+      description: Always the value `cluster`. This field is returned for consistency with other Databricks object permissions APIs.
+      example: "cluster"
+
+    instance_pool_object_id:
+      type: string
+      description: /\<object_type\>/\<object_id\>  is returned here for consistency with other Databricks object permissions APIs.
+      example: "/instance-pools/0627-190120-two15-pool-6wmqH7IJ"
+    instance_pool_object_type:
+      type: string
+      enum:
+        - instance-pool
+      description: Always the value `instance-pool`. This field is returned for consistency with other Databricks object permissions APIs.
+      example: "instance-pool"
+
+    job_object_id:
+      type: string
+      description: /\<object_type\>/\<object_id\>  is returned here for consistency with other Databricks object permissions APIs.
+      example: "/jobs/123"
+    job_object_type:
+      type: string
+      enum:
+        - job
+      description: Always the value `job`. This field is returned for consistency with other Databricks object permissions APIs.
+      example: "job"
+
+    pipeline_object_id:
+      type: string
+      description: /\<object_type\>/\<object_id\>  is returned here for consistency with other Databricks object permissions APIs.
+      example: "/pipelines/123"
+    pipeline_object_type:
+      type: string
+      enum:
+        - pipeline
+      description: Always the value `pipeline`. This field is returned for consistency with other Databricks object permissions APIs.
+      example: "pipeline"
+
+    notebook_object_id:
+      type: string
+      description: /\<object_type\>/\<object_id\>  is returned here for consistency with other Databricks object permissions APIs.
+      example: "/notebooks/108"
+    notebook_object_type:
+      type: string
+      enum:
+        - notebook
+      description: Always the value `notebook`. This field is returned for consistency with other Databricks object permissions APIs.
+      example: "notebook"
+
+    directory_object_id:
+      type: string
+      description: /\<object_type\>/\<object_id\>  is returned here for consistency with other Databricks object permissions APIs.
+      example: "/directories/112"
+    directory_object_type:
+      type: string
+      enum:
+        - directory
+      description: Always the value `directory`. This field is returned for consistency with other Databricks object permissions APIs.
+      example: "directory"
+
+    experiment_object_id:
+      type: string
+      description: /\<object_type\>/\<object_id\>  is returned here for consistency with other Databricks object permissions APIs.
+      example: "/experiments/2778373292881055"
+    experiment_object_type:
+      type: string
+      enum:
+        - experiment
+      description: Always the value `experiment`. This field is returned for consistency with other Databricks object permissions APIs.
+      example: "experiment"
+
+    registered_model_object_id:
+      type: string
+      description: /\<object_type\>/\<object_id\>  is returned here for consistency with other Databricks object permissions APIs.
+      example: "/registered-models/1234-5678-9012-3456"
+    registered_model_object_type:
+      type: string
+      enum:
+        - registered-model
+      description: Always the value `registered-model`. This field is returned for consistency with other Databricks object permissions APIs.
+      example: "registered-model"
+
+    sqlendpoints_object_id:
+      type: string
+      description: /\<object_type\>/\<object_id\>  is returned here for consistency with other Databricks object permissions APIs.
+      example: "/endpoints/3930839871f3d4ef"
+    sqlendpoints_object_type:
+      type: string
+      enum:
+        - sqlendpoint
+      description: Always the value `endpoints`. This field is returned for consistency with other Databricks object permissions APIs.
+      example: "endpoints"
+
+    repo_object_id:
+      type: string
+      description: /\<object_type\>/\<object_id\>  is returned here for consistency with other Databricks object permissions APIs.
+      example: "/repos/108"
+    repo_object_type:
+      type: string
+      enum:
+        - repo
+      description: Always the value `repo`. This field is returned for consistency with other Databricks object permissions APIs.
+      example: "repo"
+
+    inherited:
+      description:
+        "Specifies whether the permission is inherited from a parent ACL rather than set explicitly. See related property `inherited_from_object`."
+      type: boolean
+      example: false
+
+    inherited_from_object:
+      description:
+        "The list of parent ACL object IDs that contribute to inherited permission on an ACL object. This is only defined if related property `inherited` is set to `true`."
+      type: array
+      example: "/<object-type>/"
+      items:
+        type: string
+        description: Parent ACL object IDs that contribute to inherited permission on an ACL object. This property is only included if related permissions property `inherited` is set to `true`.
+
+    PermissionLevelObject:
+      oneOf:
+        - $ref: '#/components/schemas/CanManageObject'
+        - $ref: '#/components/schemas/CanUseObject'
+
+
+    ClustersPermissionLevelObject:
+      oneOf:
+        - $ref: '#/components/schemas/CanManageObject'
+        - $ref: '#/components/schemas/CanRestartObject'
+        - $ref: '#/components/schemas/CanAttachToObject'
+      example: CAN_RESTART
+
+    InstancePoolsPermissionLevelObject:
+      oneOf:
+        - $ref: '#/components/schemas/CanManageObject'
+        - $ref: '#/components/schemas/CanAttachToObject'
+      example: CAN_ATTACH_TO
+
+    JobsPermissionLevelObject:
+      oneOf:
+        - $ref: '#/components/schemas/IsOwnerObject'
+        - $ref: '#/components/schemas/CanManageRunObject'
+        - $ref: '#/components/schemas/CanViewObject'
+        - $ref: '#/components/schemas/CanManageObject'
+      example: CAN_VIEW
+
+    PipelinesPermissionLevelObject:
+      oneOf:
+        - $ref: '#/components/schemas/IsOwnerObject'
+        - $ref: '#/components/schemas/CanManageObject'
+        - $ref: '#/components/schemas/CanRunObject'
+        - $ref: '#/components/schemas/CanViewObject'
+      example: CAN_VIEW
+
+    NotebooksPermissionLevelObject:
+      oneOf:
+        - $ref: '#/components/schemas/CanReadObject'
+        - $ref: '#/components/schemas/CanRunObject'
+        - $ref: '#/components/schemas/CanEditObject'
+        - $ref: '#/components/schemas/CanManageObject'
+      example: CAN_RUN
+
+    DirectoriesPermissionLevelObject:
+      oneOf:
+        - $ref: '#/components/schemas/CanReadObject'
+        - $ref: '#/components/schemas/CanRunObject'
+        - $ref: '#/components/schemas/CanEditObject'
+        - $ref: '#/components/schemas/CanManageObject'
+      example: CAN_MANAGE
+
+    ExperimentsPermissionLevelObject:
+      oneOf:
+        - $ref: '#/components/schemas/CanReadObject'
+        - $ref: '#/components/schemas/CanEditObject'
+        - $ref: '#/components/schemas/CanManageObject'
+      example: CAN_EDIT
+
+    RegisteredModelsPermissionLevelObject:
+      oneOf:
+        - $ref: '#/components/schemas/CanReadObject'
+        - $ref: '#/components/schemas/CanEditObject'
+        - $ref: '#/components/schemas/CanManageStagingVersionsObject'
+        - $ref: '#/components/schemas/CanManageProductionVersionsObject'
+        - $ref: '#/components/schemas/CanManageObject'
+      example: CAN_EDIT
+
+    SqlEndpointsPermissionLevelObject:
+      oneOf:
+        - $ref: '#/components/schemas/CanUseObject'
+        - $ref: '#/components/schemas/CanManageObject'
+      example: CAN_USE
+
+    ReposPermissionLevelObject:
+      oneOf:
+        - $ref: '#/components/schemas/CanReadObject'
+        - $ref: '#/components/schemas/CanRunObject'
+        - $ref: '#/components/schemas/CanEditObject'
+        - $ref: '#/components/schemas/CanManageObject'
+      example: CAN_MANAGE
+
+
+    CanManageObject:
+      type: object
+      properties:
+        permission_level:
+          type: string
+          enum:
+            - CAN_MANAGE
+        description:
+          type: string
+          enum:
+            - Permission to manage this object. Applies to clusters, pools, jobs, pipelines, notebooks, directories, registered models, and repos.
+
+    CanUseObject:
+      type: object
+      properties:
+        permission_level:
+          type: string
+          enum:
+            - CAN_USE
+        description:
+          type: string
+          enum:
+            - Permission to use this object. Applies to tokens.
+
+    CanRestartObject:
+      type: object
+      properties:
+        permission_level:
+          type: string
+          enum:
+            - CAN_RESTART
+        description:
+          type: string
+          enum:
+            - Permission to restart this object. Applies to clusters.
+
+    CanAttachToObject:
+      type: object
+      properties:
+        permission_level:
+          type: string
+          enum:
+            - CAN_ATTACH_TO
+        description:
+          type: string
+          enum:
+            - Permission to attach to this object. Applies to clusters and pools.
+
+    IsOwnerObject:
+      type: object
+      properties:
+        permission_level:
+          type: string
+          enum:
+            - IS_OWNER
+        description:
+          type: string
+          enum:
+            - Permission that represents ownership of this object. Applies to jobs and pipelines.
+
+    CanManageRunObject:
+      type: object
+      properties:
+        permission_level:
+          type: string
+          enum:
+            - CAN_MANAGE_RUN
+        description:
+          type: string
+          enum:
+            - Permission to manage or run this object. Applies to jobs.
+
+    CanViewObject:
+      type: object
+      properties:
+        permission_level:
+          type: string
+          enum:
+            - CAN_VIEW
+        description:
+          type: string
+          enum:
+            - Permission to view this object. Applies to jobs and pipelines.
+
+    CanReadObject:
+      type: object
+      properties:
+        permission_level:
+          type: string
+          enum:
+            - CAN_READ
+        description:
+          type: string
+          enum:
+            - Permission to read this object. Applies to notebooks, directories, registered models, and repos.
+
+    CanRunObject:
+      type: object
+      properties:
+        permission_level:
+          type: string
+          enum:
+            - CAN_RUN
+        description:
+          type: string
+          enum:
+            - Permission to run this object. Applies to notebooks, pipelines, directories, and repos.
+
+    CanEditObject:
+      type: object
+      properties:
+        permission_level:
+          type: string
+          enum:
+            - CAN_EDIT
+        description:
+          type: string
+          enum:
+            - Permission to edit this object. Applies to notebooks, directories, registered models, and repos.
+
+    CanManageStagingVersionsObject:
+      type: object
+      properties:
+        permission_level:
+          type: string
+          enum:
+            - CAN_MANAGE_STAGING_VERSIONS
+        description:
+          type: string
+          enum:
+            - Permission to manage staging versions of this object. Applies to registered models.
+
+    CanManageProductionVersionsObject:
+      type: object
+      properties:
+        permission_level:
+          type: string
+          enum:
+            - CAN_MANAGE_PRODUCTION_VERSIONS
+        description:
+          type: string
+          enum:
+            - Permission to manage production versions of this object. Applies to registered models.
+
+    GetTokensPermissionLevels:
+      type: object
+      properties:
+        permission_levels:
+          type: array
+          items:
+            $ref: '#/components/schemas/PermissionLevelObject'
+      example:
+        - permission_level: "CAN_MANAGE"
+          description: "Can use and modify permissions on tokens"
+        - permission_level: "CAN_USE"
+          description: "Can use tokens"
+
+
+    GetClustersPermissionLevels:
+      type: object
+      properties:
+        permission_levels:
+          type: array
+          items:
+            $ref: '#/components/schemas/ClustersPermissionLevelObject'
+      example:
+        - permission_level: "CAN_MANAGE"
+          description: "Can Manage permission on cluster"
+        - permission_level: "CAN_RESTART"
+          description: "Can Restart permission on cluster"
+        - permission_level: "CAN_ATTACH_TO"
+          description: "Can Attach To permission on cluster"
+
+    GetInstancePoolsPermissionLevels:
+      type: object
+      properties:
+        permission_levels:
+          type: array
+          items:
+            $ref: '#/components/schemas/InstancePoolsPermissionLevelObject'
+      example:
+        - permission_level: "CAN_MANAGE"
+          description: "Can Manage permission on a pool"
+        - permission_level: "CAN_ATTACH_TO"
+          description: "Can Attach To permission on a pool"
+
+    GetJobsPermissionLevels:
+      type: object
+      properties:
+        permission_levels:
+          type: array
+          items:
+            $ref: '#/components/schemas/JobsPermissionLevelObject'
+      example:
+        - permission_level: "IS_OWNER"
+          description: "Is Owner permission on a job"
+        - permission_level: "CAN_MANAGE_RUN"
+          description: "Can Manage Run permission to trigger or cancel job runs"
+        - permission_level: "CAN_VIEW"
+          description: "Can View permission to view job run results"
+        - permission_level: "CAN_MANAGE"
+          description: "Can Manage grants IS_OWNER privileges to the user and the ability to change the owner"
+
+    GetPipelinesPermissionLevels:
+      type: object
+      properties:
+        permission_levels:
+          type: array
+          items:
+            $ref: '#/components/schemas/PipelinesPermissionLevelObject'
+      example:
+        - permission_level: "IS_OWNER"
+          description: "Is Owner permission on a pipeline"
+        - permission_level: "CAN_MANAGE"
+          description: "Can Manage permission to manage pipeline settings."
+        - permission_level: "CAN_RUN"
+          description: "Can Manage permission to start or stop pipeline execution."
+        - permission_level: "CAN_VIEW"
+          description: "Can View permission to view pipeline details"
+
+    GetNotebooksPermissionLevels:
+      type: object
+      properties:
+        permission_levels:
+          type: array
+          items:
+            $ref: '#/components/schemas/NotebooksPermissionLevelObject'
+      example:
+        - permission_level: "CAN_READ"
+          description: "Can view and comment on the notebook"
+        - permission_level: "CAN_RUN"
+          description: "Can view, comment, attach/detach, and run commands in the notebook"
+        - permission_level: "CAN_EDIT"
+          description: "Can view, comment, attach/detach, run commands, and edit the notebook"
+        - permission_level: "CAN_MANAGE"
+          description: "Can view, comment, attach/detach, run commands, edit, and change permissions of the notebook"
+
+    GetDirectoriesPermissionLevels:
+      type: object
+      properties:
+        permission_levels:
+          type: array
+          items:
+            $ref: '#/components/schemas/DirectoriesPermissionLevelObject'
+      example:
+        - permission_level: "CAN_READ"
+          description: "Can view and comment on notebooks in the directory"
+        - permission_level: "CAN_RUN"
+          description: "Can view, comment, attach/detach, and run commands in notebooks in the directory"
+        - permission_level: "CAN_EDIT"
+          description: "Can view, comment, attach/detach, run commands, and edit notebooks in the directory"
+        - permission_level: "CAN_MANAGE"
+          description: "Can view, comment, attach/detach, run commands, and edit notebooks in the folder, and can create, delete, and change permissions of items in the directory"
+
+    GetExperimentsPermissionLevels:
+      type: object
+      properties:
+        permission_levels:
+          type: array
+          items:
+            $ref: '#/components/schemas/ExperimentsPermissionLevelObject'
+      example:
+        - permission_level: "CAN_READ"
+          description: "Can view the experiment"
+        - permission_level: "CAN_EDIT"
+          description: "Can view, log runs, and edit the experiment"
+        - permission_level: "CAN_MANAGE"
+          description: "Can view, log runs, edit, delete, and change permissions of the experiment"
+
+    GetRegisteredModelsPermissionLevels:
+      type: object
+      properties:
+        permission_levels:
+          type: array
+          items:
+            $ref: '#/components/schemas/RegisteredModelsPermissionLevelObject'
+      example:
+        - permission_level: "CAN_READ"
+          description: "Can view the details of the registered model and its model versions, and use the model versions."
+        - permission_level: "CAN_EDIT"
+          description: "Can view and edit the details of a registered model and its model versions (except stage changes), and add new model versions."
+        - permission_level: "CAN_MANAGE_STAGING_VERSIONS"
+          description: "Can view and edit the details of a registered model and its model versions, add new model versions, and manage stage transitions between non-Production stages."
+        - permission_level: "CAN_MANAGE_PRODUCTION_VERSIONS"
+          description: "Can view and edit the details of a registered model and its model versions, add new model versions, and manage stage transitions between any stages."
+        - permission_level: "CAN_MANAGE"
+          description: "Can manage permissions on, view all details of, and perform all actions on the registered model and its model versions."
+
+    GetSqlEndpointsPermissionLevels:
+      type: object
+      properties:
+        permission_levels:
+          type: array
+          items:
+            $ref: '#/components/schemas/SqlEndpointsPermissionLevelObject'
+      example:
+        - permission_level: "CAN_MANAGE"
+          description: "Can Manage permission on SQL endpoint"
+        - permission_level: "CAN_USE"
+          description: "Can Restart permission on SQL endpoint"
+
+    GetReposPermissionLevels:
+      type: object
+      properties:
+        permission_levels:
+          type: array
+          items:
+            $ref: '#/components/schemas/ReposPermissionLevelObject'
+      example:
+        - permission_level: "CAN_READ"
+          description: "Can view and comment on notebooks in the repo"
+        - permission_level: "CAN_RUN"
+          description: "Can attach/detach notebooks and view, comment, and run commands for notebooks in the repo"
+        - permission_level: "CAN_EDIT"
+          description: "Can attach/detach notebooks and view, comment, run commands for, and edit notebooks in the repo"
+        - permission_level: "CAN_MANAGE"
+          description: "Can attach/detach notebooks and view, comment, run commands for, make edits, and change permissions for notebooks in the repo"
+
+    TokensPermissionsObjectResponse:
+      type: object
+      properties:
+        permission_level:
+          $ref: '#/components/schemas/TokensPermissionLevelForResponse'
+        inherited:
+          $ref: '#/components/schemas/inherited'
+        inherited_from_object:
+          $ref: '#/components/schemas/inherited_from_object'
+      example:
+        permission_level: CAN_USE
+        inherited: false
+
+    TokensAllPermissionsObjectResponse:
+      type: array
+      items:
+        $ref: '#/components/schemas/TokensPermissionsObjectResponse'
+
+    ClustersPermissionsObjectResponse:
+      type: object
+      properties:
+        permission_level:
+          $ref: '#/components/schemas/ClustersPermissionLevelObject'
+        inherited:
+          $ref: '#/components/schemas/inherited'
+        inherited_from_object:
+          $ref: '#/components/schemas/inherited_from_object'
+      example:
+        permission_level: CAN_RESTART
+        inherited: true
+        inherited_from_object: "/clusters/"
+
+    ClustersAllPermissionsObjectResponse:
+      type: array
+      items:
+        $ref: '#/components/schemas/ClustersPermissionsObjectResponse'
+
+    InstancePoolsPermissionsObjectResponse:
+      type: object
+      properties:
+        permission_level:
+          $ref: '#/components/schemas/InstancePoolsPermissionLevelObject'
+        inherited:
+          $ref: '#/components/schemas/inherited'
+        inherited_from_object:
+          $ref: '#/components/schemas/inherited_from_object'
+      example:
+        permission_level: CAN_ATTACH_TO
+        inherited: true
+        inherited_from_object: "/instance-pools/"
+
+    InstancePoolsAllPermissionsObjectResponse:
+      type: array
+      items:
+        $ref: '#/components/schemas/InstancePoolsPermissionsObjectResponse'
+
+    JobsPermissionsObjectResponse:
+      type: object
+      properties:
+        permission_level:
+          $ref: '#/components/schemas/JobsPermissionLevelObject'
+        inherited:
+          $ref: '#/components/schemas/inherited'
+        inherited_from_object:
+          $ref: '#/components/schemas/inherited_from_object'
+      example:
+        permission_level: CAN_MANAGE
+        inherited: true
+        inherited_from_object: "/jobs/"
+
+    JobsAllPermissionsObjectResponse:
+      type: array
+      items:
+        $ref: '#/components/schemas/JobsPermissionsObjectResponse'
+
+    PipelinesPermissionsObjectResponse:
+      type: object
+      properties:
+        permission_level:
+          $ref: '#/components/schemas/PipelinesPermissionLevelObject'
+        inherited:
+          $ref: '#/components/schemas/inherited'
+        inherited_from_object:
+          $ref: '#/components/schemas/inherited_from_object'
+      example:
+        permission_level: CAN_MANAGE
+        inherited: true
+        inherited_from_object: "/pipelines/"
+
+    PipelinesAllPermissionsObjectResponse:
+      type: array
+      items:
+        $ref: '#/components/schemas/PipelinesPermissionsObjectResponse'
+
+    NotebooksPermissionsObjectResponse:
+      type: object
+      properties:
+        permission_level:
+          $ref: '#/components/schemas/NotebooksPermissionLevelObject'
+        inherited:
+          $ref: '#/components/schemas/inherited'
+        inherited_from_object:
+          $ref: '#/components/schemas/inherited_from_object'
+      example:
+        permission_level: CAN_RUN
+        inherited: true
+        inherited_from_object: "/directories/"
+
+    NotebooksAllPermissionsObjectResponse:
+      type: array
+      items:
+        $ref: '#/components/schemas/NotebooksPermissionsObjectResponse'
+
+    DirectoriesPermissionsObjectResponse:
+      type: object
+      properties:
+        permission_level:
+          $ref: '#/components/schemas/DirectoriesPermissionLevelObject'
+        inherited:
+          $ref: '#/components/schemas/inherited'
+        inherited_from_object:
+          $ref: '#/components/schemas/inherited_from_object'
+      example:
+        permission_level: CAN_MANAGE
+        inherited: true
+        inherited_from_object: "/directories/"
+
+    DirectoriesAllPermissionsObjectResponse:
+      type: array
+      items:
+        $ref: '#/components/schemas/DirectoriesPermissionsObjectResponse'
+
+    ExperimentsPermissionsObjectResponse:
+      type: object
+      properties:
+        permission_level:
+          $ref: '#/components/schemas/ExperimentsPermissionLevelObject'
+        inherited:
+          $ref: '#/components/schemas/inherited'
+        inherited_from_object:
+          $ref: '#/components/schemas/inherited_from_object'
+      example:
+        permission_level: CAN_EDIT
+        inherited: true
+        inherited_from_object: "/experiments/"
+
+    ExperimentsAllPermissionsObjectResponse:
+      type: array
+      items:
+        $ref: '#/components/schemas/ExperimentsPermissionsObjectResponse'
+
+    RegisteredModelsPermissionsObjectResponse:
+      type: object
+      properties:
+        permission_level:
+          $ref: '#/components/schemas/RegisteredModelsPermissionLevelObject'
+        inherited:
+          $ref: '#/components/schemas/inherited'
+        inherited_from_object:
+          $ref: '#/components/schemas/inherited_from_object'
+      example:
+        permission_level: CAN_EDIT
+        inherited: false
+        inherited_from_object: "/registered-models/"
+
+    RegisteredModelsAllPermissionsObjectResponse:
+      type: array
+      items:
+        $ref: '#/components/schemas/RegisteredModelsPermissionsObjectResponse'
+
+    SqlEndpointsPermissionsObjectResponse:
+      type: object
+      properties:
+        permission_level:
+          $ref: '#/components/schemas/SqlEndpointsPermissionLevelObject'
+        inherited:
+          $ref: '#/components/schemas/inherited'
+        inherited_from_object:
+          $ref: '#/components/schemas/inherited_from_object'
+      example:
+        permission_level: CAN_USE
+        inherited: true
+        inherited_from_object: "/endpoints/"
+
+    SqlEndpointsAllPermissionsObjectResponse:
+      type: array
+      items:
+        $ref: '#/components/schemas/SqlEndpointsPermissionsObjectResponse'
+
+    ReposPermissionsObjectResponse:
+      type: object
+      properties:
+        permission_level:
+          $ref: '#/components/schemas/ReposPermissionLevelObject'
+        inherited:
+          $ref: '#/components/schemas/inherited'
+        inherited_from_object:
+          $ref: '#/components/schemas/inherited_from_object'
+      example:
+        permission_level: CAN_RUN
+        inherited: true
+        inherited_from_object: "/directories/"
+
+    ReposAllPermissionsObjectResponse:
+      type: array
+      items:
+        $ref: '#/components/schemas/ReposPermissionsObjectResponse'
+
+    TokensPermissionLevelForResponse:
+      type: string
+      enum:
+        - "CAN_USE"
+        - "CAN_MANAGE"
+      description:
+        "For all objects other than groups with name `admins`, this is `CAN_USE`, which controls who can use or create tokens.\n
+
+        For the group with name `admins`, this is `CAN_MANAGE`, which controls who can use or create tokens.\n
+
+        For details, see the [required token permission levels for various
+        actions](#tag/Token-permissions)."
+
+    TokensPermissionLevelForPatch:
+      type: string
+      enum:
+        - "CAN_USE"
+      description:
+        "Must be set to `CAN_USE`, which controls who can use or create tokens.\n
+
+        The `CAN_MANAGE` permission is for administrators only and cannot be set explicitly using the `PATCH` API because this permission is automatically tied to membership in the `admins` groups.\n
+
+        For details, see the [required token permission levels for various
+        actions](#tag/Token-permissions)."
+
+    TokensPermissionLevelForPut:
+      type: string
+      enum:
+        - "CAN_USE"
+        - "CAN_MANAGE"
+      description:
+        "For all objects other than groups with name `admins`, this must be set to `CAN_USE`, which controls who can use or create tokens.\n
+
+        For the group with name `admins`, this must be granted `CAN_MANAGE`, which controls who can use or create tokens. When using the HTTP `PUT` request to set and replace all existing permissions, you must set this explicitly for the `admins` group.\n
+
+        Note that the `CAN_MANAGE` permission is for administrators in the `admins` group only and cannot be set for any other object. \n
+
+        For details, see the [required token permission levels for various
+        actions](#tag/Token-permissions)."
+
+    CanManagePermissionsObjectResponse:
+      type: object
+      properties:
+        permission_level:
+          $ref: '#/components/schemas/TokensPermissionLevelForResponse'
+        inherited:
+          $ref: '#/components/schemas/inherited'
+        inherited_from_object:
+          description: The list of parent ACL object IDs that contribute to inherited permission on an ACL object. This is only defined if related property `inherited` is set to `true`.
+          type: array
+          example: "/<object-type>/"
+          items:
+            type: string
+            description: Parent ACL object IDs that contribute to inherited permission on an ACL object. This property is only included if related permissions property `inherited` is set to `true`.
+      example:
+        permission_level: CAN_MANAGE
+        inherited: true
+        inherited_from_object: "/<object-type>/"
+
+    CanManageAllPermissionsObjectResponse:
+      type: array
+      items:
+        $ref: '#/components/schemas/CanManagePermissionsObjectResponse'
+
+    CanManagePermissionLevel:
+      type: string
+      enum:
+        - "CAN_MANAGE"
+      description:
+        "CAN_MANAGE permission level"
+
+    user_name:
+      description: Email address for a user.
+      type: string
+      example: "jsmith@example.com"
+
+    TokensUserObjectForResponse:
+      type: object
+      properties:
+        user_name:
+          $ref: '#/components/schemas/user_name'
+        all_permissions:
+          $ref: '#/components/schemas/TokensAllPermissionsObjectResponse'
+
+    TokensUserObjectForPatch:
+      type: object
+      properties:
+        user_name:
+          $ref: '#/components/schemas/user_name'
+        permission_level:
+          $ref: '#/components/schemas/TokensPermissionLevelForPatch'
+
+    TokensUserObjectForPut:
+      type: object
+      properties:
+        user_name:
+          $ref: '#/components/schemas/user_name'
+        permission_level:
+          $ref: '#/components/schemas/TokensPermissionLevelForPut'
+
+    group_name:
+      description:
+        "Group name. There are two built-in groups: `users` for all users, and `admins` for administrators."
+      type: string
+      example: "users"
+
+    TokensGroupObjectForResponse:
+      type: object
+      properties:
+        group_name:
+          $ref: '#/components/schemas/group_name'
+        all_permissions:
+          type: array
+          items:
+            $ref: '#/components/schemas/TokensAllPermissionsObjectResponse'
+
+    TokensGroupObjectForPatch:
+      type: object
+      properties:
+        group_name:
+          $ref: '#/components/schemas/group_name'
+        permission_level:
+          $ref: '#/components/schemas/TokensPermissionLevelForPatch'
+
+    TokensGroupObjectForPut:
+      type: object
+      properties:
+        group_name:
+          $ref: '#/components/schemas/group_name'
+        permission_level:
+          $ref: '#/components/schemas/TokensPermissionLevelForPut'
+
+    service_principal_name:
+      description:
+        "`applicationId` value (a GUID) that uniquely identifies an Azure service principal."
+      type: string
+      example: "9f0621ee-b52b-11ea-b3de-0242ac130004"
+
+    TokensServicePrincipalObjectForResponse:
+      description:
+        "Permissions on an Azure service principal."
+      type: object
+      properties:
+        service_principal_name:
+          $ref: '#/components/schemas/service_principal_name'
+        all_permissions:
+          type: array
+          items:
+            $ref: '#/components/schemas/TokensAllPermissionsObjectResponse'
+
+    TokensServicePrincipalObjectForPatch:
+      description:
+        "Permissions on an Azure service principal."
+      type: object
+      properties:
+        service_principal_name:
+          $ref: '#/components/schemas/service_principal_name'
+        permission_level:
+          $ref: '#/components/schemas/TokensPermissionLevelForPatch'
+
+
+    TokensServicePrincipalObjectForPut:
+      description:
+        "Permissions on an Azure service principal."
+      type: object
+      properties:
+        service_principal_name:
+          $ref: '#/components/schemas/service_principal_name'
+        permission_level:
+          $ref: '#/components/schemas/TokensPermissionLevelForPut'
+
+    ClustersUserObjectForResponse:
+      type: object
+      properties:
+        user_name:
+          $ref: '#/components/schemas/user_name'
+        all_permissions:
+          $ref: '#/components/schemas/ClustersAllPermissionsObjectResponse'
+
+    ClustersUserObject:
+      type: object
+      properties:
+        user_name:
+          $ref: '#/components/schemas/user_name'
+        permission_level:
+          $ref: '#/components/schemas/ClustersPermissionLevelObject'
+
+    ClustersGroupObjectForResponse:
+      type: object
+      properties:
+        group_name:
+          $ref: '#/components/schemas/group_name'
+        all_permissions:
+          type: array
+          items:
+            $ref: '#/components/schemas/ClustersAllPermissionsObjectResponse'
+
+    ClustersGroupObject:
+      type: object
+      properties:
+        group_name:
+          $ref: '#/components/schemas/group_name'
+        permission_level:
+          $ref: '#/components/schemas/ClustersPermissionLevelObject'
+
+    ClustersServicePrincipalObjectForResponse:
+      description:
+        "Permissions on an Azure service principal."
+      type: object
+      properties:
+        service_principal_name:
+          $ref: '#/components/schemas/service_principal_name'
+        all_permissions:
+          description:
+            "Permissions for an Azure service principal."
+          type: array
+          items:
+            $ref: '#/components/schemas/ClustersAllPermissionsObjectResponse'
+
+    ClustersServicePrincipalObject:
+      description:
+        "Permissions on an Azure service principal."
+      type: object
+      properties:
+        service_principal_name:
+          $ref: '#/components/schemas/service_principal_name'
+        permission_level:
+          $ref: '#/components/schemas/ClustersPermissionLevelObject'
+
+    InstancePoolsUserObjectForResponse:
+      type: object
+      properties:
+        user_name:
+          $ref: '#/components/schemas/user_name'
+        all_permissions:
+          $ref: '#/components/schemas/InstancePoolsAllPermissionsObjectResponse'
+
+    InstancePoolsUserObject:
+      type: object
+      properties:
+        user_name:
+          $ref: '#/components/schemas/user_name'
+        permission_level:
+          $ref: '#/components/schemas/InstancePoolsPermissionLevelObject'
+
+    InstancePoolsGroupObjectForResponse:
+      type: object
+      properties:
+        group_name:
+          $ref: '#/components/schemas/group_name'
+        all_permissions:
+          type: array
+          items:
+            $ref: '#/components/schemas/InstancePoolsAllPermissionsObjectResponse'
+
+    InstancePoolsGroupObject:
+      type: object
+      properties:
+        group_name:
+          $ref: '#/components/schemas/group_name'
+        permission_level:
+          $ref: '#/components/schemas/InstancePoolsPermissionLevelObject'
+
+    InstancePoolsServicePrincipalObjectForResponse:
+      description:
+        "Permissions on an Azure service principal."
+      type: object
+      properties:
+        service_principal_name:
+          $ref: '#/components/schemas/service_principal_name'
+        all_permissions:
+          description:
+            "Permissions for an Azure service principal."
+          type: array
+          items:
+            $ref: '#/components/schemas/InstancePoolsAllPermissionsObjectResponse'
+
+    InstancePoolsServicePrincipalObject:
+      description:
+        "Permissions on an Azure service principal."
+      type: object
+      properties:
+        service_principal_name:
+          $ref: '#/components/schemas/service_principal_name'
+        permission_level:
+          $ref: '#/components/schemas/InstancePoolsPermissionLevelObject'
+
+    JobsUserObjectForResponse:
+      type: object
+      properties:
+        user_name:
+          $ref: '#/components/schemas/user_name'
+        all_permissions:
+          $ref: '#/components/schemas/JobsAllPermissionsObjectResponse'
+
+    JobsUserObject:
+      type: object
+      properties:
+        user_name:
+          $ref: '#/components/schemas/user_name'
+        permission_level:
+          $ref: '#/components/schemas/JobsPermissionLevelObject'
+
+    JobsGroupObjectForResponse:
+      type: object
+      properties:
+        group_name:
+          $ref: '#/components/schemas/group_name'
+        all_permissions:
+          type: array
+          items:
+            $ref: '#/components/schemas/JobsAllPermissionsObjectResponse'
+
+    JobsGroupObject:
+      type: object
+      properties:
+        group_name:
+          $ref: '#/components/schemas/group_name'
+        permission_level:
+          $ref: '#/components/schemas/JobsPermissionLevelObject'
+
+    JobsServicePrincipalObjectForResponse:
+      description:
+        "Permissions on an Azure service principal."
+      type: object
+      properties:
+        service_principal_name:
+          $ref: '#/components/schemas/service_principal_name'
+        all_permissions:
+          description:
+            "Permissions for an Azure service principal."
+          type: array
+          items:
+            $ref: '#/components/schemas/JobsAllPermissionsObjectResponse'
+
+    JobsServicePrincipalObject:
+      description:
+        "Permissions on an Azure service principal."
+      type: object
+      properties:
+        service_principal_name:
+          $ref: '#/components/schemas/service_principal_name'
+        permission_level:
+          $ref: '#/components/schemas/JobsPermissionLevelObject'
+
+    PipelinesUserObjectForResponse:
+      type: object
+      properties:
+        user_name:
+          $ref: '#/components/schemas/user_name'
+        all_permissions:
+          $ref: '#/components/schemas/PipelinesAllPermissionsObjectResponse'
+
+    PipelinesUserObject:
+      type: object
+      properties:
+        user_name:
+          $ref: '#/components/schemas/user_name'
+        permission_level:
+          $ref: '#/components/schemas/PipelinesPermissionLevelObject'
+
+    PipelinesGroupObjectForResponse:
+      type: object
+      properties:
+        group_name:
+          $ref: '#/components/schemas/group_name'
+        all_permissions:
+          type: array
+          items:
+            $ref: '#/components/schemas/PipelinesAllPermissionsObjectResponse'
+
+    PipelinesGroupObject:
+      type: object
+      properties:
+        group_name:
+          $ref: '#/components/schemas/group_name'
+        permission_level:
+          $ref: '#/components/schemas/PipelinesPermissionLevelObject'
+
+    PipelinesServicePrincipalObjectForResponse:
+      description:
+        "Permissions on a service principal."
+      type: object
+      properties:
+        service_principal_name:
+          $ref: '#/components/schemas/service_principal_name'
+        all_permissions:
+          description:
+            "Permissions for a service principal."
+          type: array
+          items:
+            $ref: '#/components/schemas/PipelinesAllPermissionsObjectResponse'
+
+    PipelinesServicePrincipalObject:
+      description:
+        "Permissions on a service principal."
+      type: object
+      properties:
+        service_principal_name:
+          $ref: '#/components/schemas/service_principal_name'
+        permission_level:
+          $ref: '#/components/schemas/PipelinesPermissionLevelObject'
+
+    NotebooksUserObjectForResponse:
+      type: object
+      properties:
+        user_name:
+          $ref: '#/components/schemas/user_name'
+        all_permissions:
+          $ref: '#/components/schemas/NotebooksAllPermissionsObjectResponse'
+
+    NotebooksUserObject:
+      type: object
+      properties:
+        user_name:
+          $ref: '#/components/schemas/user_name'
+        permission_level:
+          $ref: '#/components/schemas/NotebooksPermissionLevelObject'
+
+    NotebooksGroupObjectForResponse:
+      type: object
+      properties:
+        group_name:
+          $ref: '#/components/schemas/group_name'
+        all_permissions:
+          type: array
+          items:
+            $ref: '#/components/schemas/NotebooksAllPermissionsObjectResponse'
+
+    NotebooksGroupObject:
+      type: object
+      properties:
+        group_name:
+          $ref: '#/components/schemas/group_name'
+        permission_level:
+          $ref: '#/components/schemas/NotebooksPermissionLevelObject'
+
+    NotebooksServicePrincipalObjectForResponse:
+      description:
+        "Permissions on an Azure service principal."
+      type: object
+      properties:
+        service_principal_name:
+          $ref: '#/components/schemas/service_principal_name'
+        all_permissions:
+          description:
+            "Permissions for an Azure service principal."
+          type: array
+          items:
+            $ref: '#/components/schemas/NotebooksAllPermissionsObjectResponse'
+
+    NotebooksServicePrincipalObject:
+      description:
+        "Permissions on an Azure service principal."
+      type: object
+      properties:
+        service_principal_name:
+          $ref: '#/components/schemas/service_principal_name'
+        permission_level:
+          $ref: '#/components/schemas/NotebooksPermissionLevelObject'
+
+    DirectoriesUserObjectForResponse:
+      type: object
+      properties:
+        user_name:
+          $ref: '#/components/schemas/user_name'
+        all_permissions:
+          $ref: '#/components/schemas/DirectoriesAllPermissionsObjectResponse'
+
+    DirectoriesUserObject:
+      type: object
+      properties:
+        user_name:
+          $ref: '#/components/schemas/user_name'
+        permission_level:
+          $ref: '#/components/schemas/DirectoriesPermissionLevelObject'
+
+    DirectoriesGroupObjectForResponse:
+      type: object
+      properties:
+        group_name:
+          $ref: '#/components/schemas/group_name'
+        all_permissions:
+          type: array
+          items:
+            $ref: '#/components/schemas/DirectoriesAllPermissionsObjectResponse'
+
+    DirectoriesGroupObject:
+      type: object
+      properties:
+        group_name:
+          $ref: '#/components/schemas/group_name'
+        permission_level:
+          $ref: '#/components/schemas/DirectoriesPermissionLevelObject'
+
+    DirectoriesServicePrincipalObjectForResponse:
+      description:
+        "Permissions on an Azure service principal."
+      type: object
+      properties:
+        service_principal_name:
+          $ref: '#/components/schemas/service_principal_name'
+        all_permissions:
+          description:
+            "Permissions for an Azure service principal."
+          type: array
+          items:
+            $ref: '#/components/schemas/DirectoriesAllPermissionsObjectResponse'
+
+    DirectoriesServicePrincipalObject:
+      description:
+        "Permissions on an Azure service principal."
+      type: object
+      properties:
+        service_principal_name:
+          $ref: '#/components/schemas/service_principal_name'
+        permission_level:
+          $ref: '#/components/schemas/DirectoriesPermissionLevelObject'
+
+    ExperimentsUserObjectForResponse:
+      type: object
+      properties:
+        user_name:
+          $ref: '#/components/schemas/user_name'
+        all_permissions:
+          $ref: '#/components/schemas/ExperimentsAllPermissionsObjectResponse'
+
+    ExperimentsUserObject:
+      type: object
+      properties:
+        user_name:
+          $ref: '#/components/schemas/user_name'
+        permission_level:
+          $ref: '#/components/schemas/ExperimentsPermissionLevelObject'
+
+    ExperimentsGroupObjectForResponse:
+      type: object
+      properties:
+        group_name:
+          $ref: '#/components/schemas/group_name'
+        all_permissions:
+          type: array
+          items:
+            $ref: '#/components/schemas/ExperimentsAllPermissionsObjectResponse'
+
+    ExperimentsGroupObject:
+      type: object
+      properties:
+        group_name:
+          $ref: '#/components/schemas/group_name'
+        permission_level:
+          $ref: '#/components/schemas/ExperimentsPermissionLevelObject'
+
+    ExperimentsServicePrincipalObjectForResponse:
+      description:
+        "Permissions on an Azure service principal."
+      type: object
+      properties:
+        service_principal_name:
+          $ref: '#/components/schemas/service_principal_name'
+        all_permissions:
+          description:
+            "Permissions for an Azure service principal."
+          type: array
+          items:
+            $ref: '#/components/schemas/ExperimentsAllPermissionsObjectResponse'
+
+    ExperimentsServicePrincipalObject:
+      description:
+        "Permissions on an Azure service principal."
+      type: object
+      properties:
+        service_principal_name:
+          $ref: '#/components/schemas/service_principal_name'
+        permission_level:
+          $ref: '#/components/schemas/ExperimentsPermissionLevelObject'
+
+    RegisteredModelsUserObjectForResponse:
+      type: object
+      properties:
+        user_name:
+          $ref: '#/components/schemas/user_name'
+        all_permissions:
+          $ref: '#/components/schemas/RegisteredModelsAllPermissionsObjectResponse'
+
+    RegisteredModelsUserObject:
+      type: object
+      properties:
+        user_name:
+          $ref: '#/components/schemas/user_name'
+        permission_level:
+          $ref: '#/components/schemas/RegisteredModelsPermissionLevelObject'
+
+    RegisteredModelsGroupObjectForResponse:
+      type: object
+      properties:
+        group_name:
+          $ref: '#/components/schemas/group_name'
+        all_permissions:
+          type: array
+          items:
+            $ref: '#/components/schemas/RegisteredModelsAllPermissionsObjectResponse'
+
+    RegisteredModelsGroupObject:
+      type: object
+      properties:
+        group_name:
+          $ref: '#/components/schemas/group_name'
+        permission_level:
+          $ref: '#/components/schemas/RegisteredModelsPermissionLevelObject'
+
+    RegisteredModelsServicePrincipalObjectForResponse:
+      description:
+        "Permissions on an Azure service principal."
+      type: object
+      properties:
+        service_principal_name:
+          $ref: '#/components/schemas/service_principal_name'
+        all_permissions:
+          description:
+            "Permissions for an Azure service principal."
+          type: array
+          items:
+            $ref: '#/components/schemas/RegisteredModelsAllPermissionsObjectResponse'
+
+    RegisteredModelsServicePrincipalObject:
+      description:
+        "Permissions on an Azure service principal."
+      type: object
+      properties:
+        service_principal_name:
+          $ref: '#/components/schemas/service_principal_name'
+        permission_level:
+          $ref: '#/components/schemas/RegisteredModelsPermissionLevelObject'
+
+    SqlEndpointsUserObjectForResponse:
+      type: object
+      properties:
+        user_name:
+          $ref: '#/components/schemas/user_name'
+        all_permissions:
+          $ref: '#/components/schemas/SqlEndpointsAllPermissionsObjectResponse'
+
+    SqlEndpointsUserObject:
+      type: object
+      properties:
+        user_name:
+          $ref: '#/components/schemas/user_name'
+        permission_level:
+          $ref: '#/components/schemas/SqlEndpointsPermissionLevelObject'
+
+    SqlEndpointsGroupObjectForResponse:
+      type: object
+      properties:
+        group_name:
+          $ref: '#/components/schemas/group_name'
+        all_permissions:
+          type: array
+          items:
+            $ref: '#/components/schemas/SqlEndpointsAllPermissionsObjectResponse'
+
+    SqlEndpointsGroupObject:
+      type: object
+      properties:
+        group_name:
+          $ref: '#/components/schemas/group_name'
+        permission_level:
+          $ref: '#/components/schemas/SqlEndpointsPermissionLevelObject'
+
+    SqlEndpointsServicePrincipalObjectForResponse:
+      description:
+        "Permissions on an Azure service principal."
+      type: object
+      properties:
+        service_principal_name:
+          $ref: '#/components/schemas/service_principal_name'
+        all_permissions:
+          description:
+            "Permissions for an Azure service principal."
+          type: array
+          items:
+            $ref: '#/components/schemas/SqlEndpointsAllPermissionsObjectResponse'
+
+    SqlEndpointsServicePrincipalObject:
+      description:
+        "Permissions on an Azure service principal."
+      type: object
+      properties:
+        service_principal_name:
+          $ref: '#/components/schemas/service_principal_name'
+        permission_level:
+          $ref: '#/components/schemas/SqlEndpointsPermissionLevelObject'
+
+    ReposUserObjectForResponse:
+      type: object
+      properties:
+        user_name:
+          $ref: '#/components/schemas/user_name'
+        all_permissions:
+          $ref: '#/components/schemas/ReposAllPermissionsObjectResponse'
+
+    ReposUserObject:
+      type: object
+      properties:
+        user_name:
+          $ref: '#/components/schemas/user_name'
+        permission_level:
+          $ref: '#/components/schemas/ReposPermissionLevelObject'
+
+    ReposGroupObjectForResponse:
+      type: object
+      properties:
+        group_name:
+          $ref: '#/components/schemas/group_name'
+        all_permissions:
+          type: array
+          items:
+            $ref: '#/components/schemas/ReposAllPermissionsObjectResponse'
+
+    ReposGroupObject:
+      type: object
+      properties:
+        group_name:
+          $ref: '#/components/schemas/group_name'
+        permission_level:
+          $ref: '#/components/schemas/ReposPermissionLevelObject'
+
+    ReposServicePrincipalObjectForResponse:
+      description:
+        "Permissions on an Azure service principal."
+      type: object
+      properties:
+        service_principal_name:
+          $ref: '#/components/schemas/service_principal_name'
+        all_permissions:
+          description:
+            "Permissions for an Azure service principal."
+          type: array
+          items:
+            $ref: '#/components/schemas/ReposAllPermissionsObjectResponse'
+
+    ReposServicePrincipalObject:
+      description:
+        "Permissions on an Azure service principal."
+      type: object
+      properties:
+        service_principal_name:
+          $ref: '#/components/schemas/service_principal_name'
+        permission_level:
+          $ref: '#/components/schemas/ReposPermissionLevelObject'
+
+    TokensAccessControlListsObjectForResponse:
+      oneOf:
+        - $ref: '#/components/schemas/TokensUserObjectForResponse'
+        - $ref: '#/components/schemas/TokensGroupObjectForResponse'
+        - $ref: '#/components/schemas/TokensServicePrincipalObjectForResponse'
+
+    TokensAccessControlListsObjectForPatch:
+      oneOf:
+        - $ref: '#/components/schemas/TokensUserObjectForPatch'
+        - $ref: '#/components/schemas/TokensGroupObjectForPatch'
+        - $ref: '#/components/schemas/TokensServicePrincipalObjectForPatch'
+
+    TokensAccessControlListsObjectForPut:
+      oneOf:
+        - $ref: '#/components/schemas/TokensUserObjectForPut'
+        - $ref: '#/components/schemas/TokensGroupObjectForPut'
+        - $ref: '#/components/schemas/TokensServicePrincipalObjectForPut'
+
+
+    ClustersAccessControlListsObjectForResponse:
+      oneOf:
+        - $ref: '#/components/schemas/ClustersUserObjectForResponse'
+        - $ref: '#/components/schemas/ClustersGroupObjectForResponse'
+        - $ref: '#/components/schemas/ClustersServicePrincipalObjectForResponse'
+
+    ClustersAccessControlListsObjectForPatch:
+      oneOf:
+        - $ref: '#/components/schemas/ClustersUserObject'
+        - $ref: '#/components/schemas/ClustersGroupObject'
+        - $ref: '#/components/schemas/ClustersServicePrincipalObject'
+
+    ClustersAccessControlListsObjectForPut:
+      oneOf:
+        - $ref: '#/components/schemas/ClustersUserObject'
+        - $ref: '#/components/schemas/ClustersGroupObject'
+        - $ref: '#/components/schemas/ClustersServicePrincipalObject'
+
+    InstancePoolsAccessControlListsObjectForResponse:
+      oneOf:
+        - $ref: '#/components/schemas/InstancePoolsUserObjectForResponse'
+        - $ref: '#/components/schemas/InstancePoolsGroupObjectForResponse'
+        - $ref: '#/components/schemas/InstancePoolsServicePrincipalObjectForResponse'
+
+    InstancePoolsAccessControlListsObjectForPatch:
+      oneOf:
+        - $ref: '#/components/schemas/InstancePoolsUserObject'
+        - $ref: '#/components/schemas/InstancePoolsGroupObject'
+        - $ref: '#/components/schemas/InstancePoolsServicePrincipalObject'
+
+    InstancePoolsAccessControlListsObjectForPut:
+      oneOf:
+        - $ref: '#/components/schemas/InstancePoolsUserObject'
+        - $ref: '#/components/schemas/InstancePoolsGroupObject'
+        - $ref: '#/components/schemas/InstancePoolsServicePrincipalObject'
+
+    JobsAccessControlListsObjectForResponse:
+      oneOf:
+        - $ref: '#/components/schemas/JobsUserObjectForResponse'
+        - $ref: '#/components/schemas/JobsGroupObjectForResponse'
+        - $ref: '#/components/schemas/JobsServicePrincipalObjectForResponse'
+
+    JobsAccessControlListsObjectForPatch:
+      oneOf:
+        - $ref: '#/components/schemas/JobsUserObject'
+        - $ref: '#/components/schemas/JobsGroupObject'
+        - $ref: '#/components/schemas/JobsServicePrincipalObject'
+
+    JobsAccessControlListsObjectForPut:
+      oneOf:
+        - $ref: '#/components/schemas/JobsUserObject'
+        - $ref: '#/components/schemas/JobsGroupObject'
+        - $ref: '#/components/schemas/JobsServicePrincipalObject'
+
+    PipelinesAccessControlListsObjectForResponse:
+      oneOf:
+        - $ref: '#/components/schemas/PipelinesUserObjectForResponse'
+        - $ref: '#/components/schemas/PipelinesGroupObjectForResponse'
+        - $ref: '#/components/schemas/PipelinesServicePrincipalObjectForResponse'
+
+    PipelinesAccessControlListsObjectForPatch:
+      oneOf:
+        - $ref: '#/components/schemas/PipelinesUserObject'
+        - $ref: '#/components/schemas/PipelinesGroupObject'
+        - $ref: '#/components/schemas/PipelinesServicePrincipalObject'
+
+    PipelinesAccessControlListsObjectForPut:
+      oneOf:
+        - $ref: '#/components/schemas/PipelinesUserObject'
+        - $ref: '#/components/schemas/PipelinesGroupObject'
+        - $ref: '#/components/schemas/PipelinesServicePrincipalObject'
+
+    NotebooksAccessControlListsObjectForResponse:
+      oneOf:
+        - $ref: '#/components/schemas/NotebooksUserObjectForResponse'
+        - $ref: '#/components/schemas/NotebooksGroupObjectForResponse'
+        - $ref: '#/components/schemas/NotebooksServicePrincipalObjectForResponse'
+
+    NotebooksAccessControlListsObjectForPatch:
+      oneOf:
+        - $ref: '#/components/schemas/NotebooksUserObject'
+        - $ref: '#/components/schemas/NotebooksGroupObject'
+        - $ref: '#/components/schemas/NotebooksServicePrincipalObject'
+
+    NotebooksAccessControlListsObjectForPut:
+      oneOf:
+        - $ref: '#/components/schemas/NotebooksUserObject'
+        - $ref: '#/components/schemas/NotebooksGroupObject'
+        - $ref: '#/components/schemas/NotebooksServicePrincipalObject'
+
+    DirectoriesAccessControlListsObjectForResponse:
+      oneOf:
+        - $ref: '#/components/schemas/DirectoriesUserObjectForResponse'
+        - $ref: '#/components/schemas/DirectoriesGroupObjectForResponse'
+        - $ref: '#/components/schemas/DirectoriesServicePrincipalObjectForResponse'
+
+    DirectoriesAccessControlListsObjectForPatch:
+      oneOf:
+        - $ref: '#/components/schemas/DirectoriesUserObject'
+        - $ref: '#/components/schemas/DirectoriesGroupObject'
+        - $ref: '#/components/schemas/DirectoriesServicePrincipalObject'
+
+    DirectoriesAccessControlListsObjectForPut:
+      oneOf:
+        - $ref: '#/components/schemas/DirectoriesUserObject'
+        - $ref: '#/components/schemas/DirectoriesGroupObject'
+        - $ref: '#/components/schemas/DirectoriesServicePrincipalObject'
+
+    ExperimentsAccessControlListsObjectForResponse:
+      oneOf:
+        - $ref: '#/components/schemas/ExperimentsUserObjectForResponse'
+        - $ref: '#/components/schemas/ExperimentsGroupObjectForResponse'
+        - $ref: '#/components/schemas/ExperimentsServicePrincipalObjectForResponse'
+
+    ExperimentsAccessControlListsObjectForPatch:
+      oneOf:
+        - $ref: '#/components/schemas/ExperimentsUserObject'
+        - $ref: '#/components/schemas/ExperimentsGroupObject'
+        - $ref: '#/components/schemas/ExperimentsServicePrincipalObject'
+
+    ExperimentsAccessControlListsObjectForPut:
+      oneOf:
+        - $ref: '#/components/schemas/ExperimentsUserObject'
+        - $ref: '#/components/schemas/ExperimentsGroupObject'
+        - $ref: '#/components/schemas/ExperimentsServicePrincipalObject'
+
+    RegisteredModelsAccessControlListsObjectForResponse:
+      oneOf:
+        - $ref: '#/components/schemas/RegisteredModelsUserObjectForResponse'
+        - $ref: '#/components/schemas/RegisteredModelsGroupObjectForResponse'
+        - $ref: '#/components/schemas/RegisteredModelsServicePrincipalObjectForResponse'
+
+    RegisteredModelsAccessControlListsObjectForPatch:
+      oneOf:
+        - $ref: '#/components/schemas/RegisteredModelsUserObject'
+        - $ref: '#/components/schemas/RegisteredModelsGroupObject'
+        - $ref: '#/components/schemas/RegisteredModelsServicePrincipalObject'
+
+    RegisteredModelsAccessControlListsObjectForPut:
+      oneOf:
+        - $ref: '#/components/schemas/RegisteredModelsUserObject'
+        - $ref: '#/components/schemas/RegisteredModelsGroupObject'
+        - $ref: '#/components/schemas/RegisteredModelsServicePrincipalObject'
+
+    SqlEndpointsAccessControlListsObjectForResponse:
+      oneOf:
+        - $ref: '#/components/schemas/SqlEndpointsUserObjectForResponse'
+        - $ref: '#/components/schemas/SqlEndpointsGroupObjectForResponse'
+        - $ref: '#/components/schemas/SqlEndpointsServicePrincipalObjectForResponse'
+
+    SqlEndpointsAccessControlListsObjectForPatch:
+      oneOf:
+        - $ref: '#/components/schemas/SqlEndpointsUserObject'
+        - $ref: '#/components/schemas/SqlEndpointsGroupObject'
+        - $ref: '#/components/schemas/SqlEndpointsServicePrincipalObject'
+
+    SqlEndpointsAccessControlListsObjectForPut:
+      oneOf:
+        - $ref: '#/components/schemas/SqlEndpointsUserObject'
+        - $ref: '#/components/schemas/SqlEndpointsGroupObject'
+        - $ref: '#/components/schemas/SqlEndpointsServicePrincipalObject'
+
+    ReposAccessControlListsObjectForResponse:
+      oneOf:
+        - $ref: '#/components/schemas/ReposUserObjectForResponse'
+        - $ref: '#/components/schemas/ReposGroupObjectForResponse'
+        - $ref: '#/components/schemas/ReposServicePrincipalObjectForResponse'
+
+    ReposAccessControlListsObjectForPatch:
+      oneOf:
+        - $ref: '#/components/schemas/ReposUserObject'
+        - $ref: '#/components/schemas/ReposGroupObject'
+        - $ref: '#/components/schemas/ReposServicePrincipalObject'
+
+    ReposAccessControlListsObjectForPut:
+      oneOf:
+        - $ref: '#/components/schemas/ReposUserObject'
+        - $ref: '#/components/schemas/ReposGroupObject'
+        - $ref: '#/components/schemas/ReposServicePrincipalObject'
+
+    GetTokensPermissionResponse:
+      type: object
+      properties:
+        object_id:
+          $ref: '#/components/schemas/object_id'
+        object_type:
+          $ref: '#/components/schemas/object_type'
+        access_control_list:
+          type: array
+          items:
+            $ref: '#/components/schemas/TokensAccessControlListsObjectForResponse'
+
+    PatchTokenPermissionRequest:
+      type: object
+      properties:
+        access_control_list:
+          type: array
+          items:
+            $ref: '#/components/schemas/TokensAccessControlListsObjectForPatch'
+
+    PutTokenPermissionRequest:
+      type: object
+      properties:
+        access_control_list:
+          type: array
+          items:
+            $ref: '#/components/schemas/TokensAccessControlListsObjectForPut'
+
+
+    GetClustersPermissionResponse:
+      type: object
+      properties:
+        object_id:
+          $ref: '#/components/schemas/clusters_object_id'
+        object_type:
+          $ref: '#/components/schemas/clusters_object_type'
+        access_control_list:
+          type: array
+          items:
+            $ref: '#/components/schemas/ClustersAccessControlListsObjectForResponse'
+
+    PatchClustersPermissionRequest:
+      type: object
+      properties:
+        access_control_list:
+          type: array
+          items:
+            $ref: '#/components/schemas/ClustersAccessControlListsObjectForPatch'
+
+    PutClustersPermissionRequest:
+      type: object
+      properties:
+        access_control_list:
+          type: array
+          items:
+            $ref: '#/components/schemas/ClustersAccessControlListsObjectForPut'
+
+    GetInstancePoolsPermissionResponse:
+      type: object
+      properties:
+        object_id:
+          $ref: '#/components/schemas/instance_pool_object_id'
+        object_type:
+          $ref: '#/components/schemas/instance_pool_object_type'
+        access_control_list:
+          type: array
+          items:
+            $ref: '#/components/schemas/InstancePoolsAccessControlListsObjectForResponse'
+
+    PatchInstancePoolsPermissionRequest:
+      type: object
+      properties:
+        access_control_list:
+          type: array
+          items:
+            $ref: '#/components/schemas/InstancePoolsAccessControlListsObjectForPatch'
+
+    PutInstancePoolsPermissionRequest:
+      type: object
+      properties:
+        access_control_list:
+          type: array
+          items:
+            $ref: '#/components/schemas/InstancePoolsAccessControlListsObjectForPut'
+
+    GetJobsPermissionResponse:
+      type: object
+      properties:
+        object_id:
+          $ref: '#/components/schemas/job_object_id'
+        object_type:
+          $ref: '#/components/schemas/job_object_type'
+        access_control_list:
+          type: array
+          items:
+            $ref: '#/components/schemas/JobsAccessControlListsObjectForResponse'
+
+    PatchJobsPermissionRequest:
+      type: object
+      properties:
+        access_control_list:
+          type: array
+          items:
+            $ref: '#/components/schemas/JobsAccessControlListsObjectForPatch'
+
+    PutJobsPermissionRequest:
+      type: object
+      properties:
+        access_control_list:
+          type: array
+          items:
+            $ref: '#/components/schemas/JobsAccessControlListsObjectForPut'
+
+    GetPipelinesPermissionResponse:
+      type: object
+      properties:
+        object_id:
+          $ref: '#/components/schemas/pipeline_object_id'
+        object_type:
+          $ref: '#/components/schemas/pipeline_object_type'
+        access_control_list:
+          type: array
+          items:
+            $ref: '#/components/schemas/PipelinesAccessControlListsObjectForResponse'
+
+    PatchPipelinesPermissionRequest:
+      type: object
+      properties:
+        access_control_list:
+          type: array
+          items:
+            $ref: '#/components/schemas/PipelinesAccessControlListsObjectForPatch'
+
+    PutPipelinesPermissionRequest:
+      type: object
+      properties:
+        access_control_list:
+          type: array
+          items:
+            $ref: '#/components/schemas/PipelinesAccessControlListsObjectForPut'
+
+    GetNotebooksPermissionResponse:
+      type: object
+      properties:
+        object_id:
+          $ref: '#/components/schemas/notebook_object_id'
+        object_type:
+          $ref: '#/components/schemas/notebook_object_type'
+        access_control_list:
+          type: array
+          items:
+            $ref: '#/components/schemas/NotebooksAccessControlListsObjectForResponse'
+
+    PatchNotebooksPermissionRequest:
+      type: object
+      properties:
+        access_control_list:
+          type: array
+          items:
+            $ref: '#/components/schemas/NotebooksAccessControlListsObjectForPatch'
+
+    PutNotebooksPermissionRequest:
+      type: object
+      properties:
+        access_control_list:
+          type: array
+          items:
+            $ref: '#/components/schemas/NotebooksAccessControlListsObjectForPut'
+
+    GetDirectoriesPermissionResponse:
+      type: object
+      properties:
+        object_id:
+          $ref: '#/components/schemas/directory_object_id'
+        object_type:
+          $ref: '#/components/schemas/directory_object_type'
+        access_control_list:
+          type: array
+          items:
+            $ref: '#/components/schemas/DirectoriesAccessControlListsObjectForResponse'
+
+    PatchDirectoriesPermissionRequest:
+      type: object
+      properties:
+        access_control_list:
+          type: array
+          items:
+            $ref: '#/components/schemas/DirectoriesAccessControlListsObjectForPatch'
+
+    PutDirectoriesPermissionRequest:
+      type: object
+      properties:
+        access_control_list:
+          type: array
+          items:
+            $ref: '#/components/schemas/DirectoriesAccessControlListsObjectForPut'
+
+    GetExperimentsPermissionResponse:
+      type: object
+      properties:
+        object_id:
+          $ref: '#/components/schemas/experiment_object_id'
+        object_type:
+          $ref: '#/components/schemas/experiment_object_type'
+        access_control_list:
+          type: array
+          items:
+            $ref: '#/components/schemas/ExperimentsAccessControlListsObjectForResponse'
+
+    PatchExperimentsPermissionRequest:
+      type: object
+      properties:
+        access_control_list:
+          type: array
+          items:
+            $ref: '#/components/schemas/ExperimentsAccessControlListsObjectForPatch'
+
+    PutExperimentsPermissionRequest:
+      type: object
+      properties:
+        access_control_list:
+          type: array
+          items:
+            $ref: '#/components/schemas/ExperimentsAccessControlListsObjectForPut'
+
+    GetRegisteredModelsPermissionResponse:
+      type: object
+      properties:
+        object_id:
+          $ref: '#/components/schemas/registered_model_object_id'
+        object_type:
+          $ref: '#/components/schemas/registered_model_object_type'
+        access_control_list:
+          type: array
+          items:
+            $ref: '#/components/schemas/RegisteredModelsAccessControlListsObjectForResponse'
+
+    PatchRegisteredModelsPermissionRequest:
+      type: object
+      properties:
+        access_control_list:
+          type: array
+          items:
+            $ref: '#/components/schemas/RegisteredModelsAccessControlListsObjectForPatch'
+
+    PutRegisteredModelsPermissionRequest:
+      type: object
+      properties:
+        access_control_list:
+          type: array
+          items:
+            $ref: '#/components/schemas/RegisteredModelsAccessControlListsObjectForPut'
+    GetSqlEndpointsPermissionResponse:
+      type: object
+      properties:
+        object_id:
+          $ref: '#/components/schemas/sqlendpoints_object_id'
+        object_type:
+          $ref: '#/components/schemas/sqlendpoints_object_type'
+        access_control_list:
+          type: array
+          items:
+            $ref: '#/components/schemas/SqlEndpointsAccessControlListsObjectForResponse'
+
+    PatchSqlEndpointsPermissionRequest:
+      type: object
+      properties:
+        access_control_list:
+          type: array
+          items:
+            $ref: '#/components/schemas/SqlEndpointsAccessControlListsObjectForPatch'
+
+    PutSqlEndpointsPermissionRequest:
+      type: object
+      properties:
+        access_control_list:
+          type: array
+          items:
+            $ref: '#/components/schemas/SqlEndpointsAccessControlListsObjectForPut'
+
+    GetReposPermissionResponse:
+      type: object
+      properties:
+        object_id:
+          $ref: '#/components/schemas/repo_object_id'
+        object_type:
+          $ref: '#/components/schemas/repo_object_type'
+        access_control_list:
+          type: array
+          items:
+            $ref: '#/components/schemas/ReposAccessControlListsObjectForResponse'
+
+    PatchReposPermissionRequest:
+      type: object
+      properties:
+        access_control_list:
+          type: array
+          items:
+            $ref: '#/components/schemas/ReposAccessControlListsObjectForPatch'
+
+    PutReposPermissionRequest:
+      type: object
+      properties:
+        access_control_list:
+          type: array
+          items:
+            $ref: '#/components/schemas/ReposAccessControlListsObjectForPut'
+
+    Error:
+      type: object
+      properties:
+        error_code:
+          type: string
+          description: Error code
+        message:
+          type: string
+          description: Human-readable error message that describes the cause of the error.
+  responses:
+    WorkspaceConfBadRequest:
+      description: The request is malformed. See the error code and message for details.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          examples:
+            Bad Request - Invalid Keys:
+              value:
+                error_code: "BAD_REQUEST"
+                message:
+                  - "Invalid keys: <key-name>"
+            Bad Request - Invalid Values:
+              value:
+                error_code: "BAD_REQUEST"
+                message:
+                  - "Some values are not allowed: <message>"
+    Unauthorized:
+      description: The request is unauthorized.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            error_code: "PERMISSION_DENIED"
+            message: "Only Admins can access token management APIs"
+    FeatureDisabled:
+      description: The requested feature is not available
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          examples:
+            Feature disabled:
+              value:
+                error_code: "FEATURE_DISABLED"
+                message: "<feature-name> is not enabled for this feature tier"
+    NotFound:
+      description: The requested resource does not exist.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          examples:
+            Feature disabled:
+              value:
+                error_code: "FEATURE_DISABLED"
+                message: "<feature-name> is not enabled for this feature tier"
+            Resource does not exist:
+              value:
+                error_code: "RESOURCE_DOES_NOT_EXIST"
+                message: "Token with ID <token-id> does not exist"
+    InternalError:
+      description: The request is not handled correctly due to a server error.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    PermissionsUnauthorized:
+      description: The request is unauthorized.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            error_code: "PERMISSION_DENIED"
+            message: "Please contact the owner or an administrator for access."
+    PermissionsBadRequest:
+      description: The request is malformed.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          examples:
+            bad_request:
+              value:
+                error_code: "BAD_REQUEST"
+                message: "Bad object ID: <error-message>"
+
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: String
+      description: >-
+        You can authenticate with a Databricks personal access token (PAT) that you
+        create for yourself within the application user interface.
+security:
+  - bearerAuth: []
